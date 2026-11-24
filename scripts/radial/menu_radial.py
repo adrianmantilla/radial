@@ -10,35 +10,15 @@ teclas (y el doble Tab) aunque el menú esté a la vista. Fuera de los puntos,
 la línea y el centro, los clics pasan a Maya.
 """
 
-from radial import iconos
 from radial import radiales as rd
-from radial.qt import QtCore, QtGui, QtSvg, QtWidgets, posicion_global, posicion_local
+from radial.dibujo import (COLOR_ABIERTO, COLOR_AGARRE, COLOR_AGARRE_SOBRE, COLOR_BORDE, COLOR_CENTRO,
+                           COLOR_DETALLE, COLOR_LINEA, COLOR_PUNTO, COLOR_TEXTO, dibujar_icono_boton,
+                           dibujar_texto, mezclar)
+from radial.qt import QtCore, QtGui, QtWidgets, posicion_global, posicion_local
 
 Qt = QtCore.Qt
 
 _PASO_ANIMACION = 0.22
-_TAM_ICONO = 22.0
-
-
-def _mezclar(a, b, t):
-    return QtGui.QColor(
-        int(a.red() + (b.red() - a.red()) * t),
-        int(a.green() + (b.green() - a.green()) * t),
-        int(a.blue() + (b.blue() - a.blue()) * t),
-        int(a.alpha() + (b.alpha() - a.alpha()) * t),
-    )
-
-
-COLOR_PUNTO = QtGui.QColor(16, 17, 19, 178)
-COLOR_ABIERTO = QtGui.QColor(244, 244, 244, 255)
-COLOR_BORDE = QtGui.QColor(255, 255, 255, 72)
-COLOR_LINEA = QtGui.QColor(255, 255, 255, 46)
-COLOR_CENTRO = QtGui.QColor(16, 17, 19, 170)
-COLOR_AGARRE = QtGui.QColor(255, 255, 255, 95)
-COLOR_AGARRE_SOBRE = QtGui.QColor(255, 255, 255, 200)
-COLOR_TEXTO = QtGui.QColor(242, 242, 242)
-COLOR_DETALLE = QtGui.QColor(196, 196, 196)
-COLOR_SOMBRA = QtGui.QColor(0, 0, 0, 150)
 
 
 class MenuRadial(QtWidgets.QWidget):
@@ -208,31 +188,6 @@ class MenuRadial(QtWidgets.QWidget):
 
     # --- Dibujo ---------------------------------------------------------------
 
-    def _icono(self, boton, tamano):
-        """QPixmap del icono del botón (en negro, para el círculo blanco) o None."""
-        clave = (boton["icono"], boton["texto"], int(tamano), self.devicePixelRatioF())
-        if clave in self._cache_iconos:
-            return self._cache_iconos[clave]
-        escala = self.devicePixelRatioF()
-        lado = max(1, int(tamano * escala))
-        mapa = None
-        datos = iconos.svg(boton["icono"])
-        if datos is not None and QtSvg is not None:
-            mapa = QtGui.QPixmap(lado, lado)
-            mapa.fill(Qt.transparent)
-            pintor = QtGui.QPainter(mapa)
-            pintor.setRenderHint(QtGui.QPainter.Antialiasing)
-            QtSvg.QSvgRenderer(QtCore.QByteArray(datos)).render(pintor)
-            pintor.end()
-        elif iconos.es_imagen(boton["icono"]):
-            imagen = QtGui.QPixmap(boton["icono"])
-            if not imagen.isNull():
-                mapa = imagen.scaled(lado, lado, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-        if mapa is not None:
-            mapa.setDevicePixelRatio(escala)
-        self._cache_iconos[clave] = mapa
-        return mapa
-
     def paintEvent(self, evento):
         ap = self.apariencia
         pintor = QtGui.QPainter(self)
@@ -260,54 +215,24 @@ class MenuRadial(QtWidgets.QWidget):
             boton = self.radial["botones"][i]
             a = self._apertura[i]
             r = ap["punto"] + (ap["abierto"] - ap["punto"]) * a
-            pintor.setBrush(_mezclar(COLOR_PUNTO, COLOR_ABIERTO, a))
-            borde = _mezclar(COLOR_BORDE, COLOR_ABIERTO, a)
+            pintor.setBrush(mezclar(COLOR_PUNTO, COLOR_ABIERTO, a))
+            borde = mezclar(COLOR_BORDE, COLOR_ABIERTO, a)
             if boton["tipo"] == "vacio":
                 borde.setAlpha(borde.alpha() // 2)
             pintor.setPen(QtGui.QPen(borde, 1.0))
             pintor.drawEllipse(QtCore.QPointF(x, y), r, r)
             if a > 0.05:
-                self._dibujar_icono(pintor, boton, x, y, r, a)
+                dibujar_icono_boton(pintor, boton, (x, y), r, ap["opacidad"] * a, self._cache_iconos,
+                                    self.devicePixelRatioF())
 
         # Nombre del botón bajo el ratón
         if isinstance(self._sobre, int):
             boton = self.radial["botones"][self._sobre]
             if boton["tipo"] != "vacio":
                 y_texto, y_detalle = self._lineas_texto_y()
-                self._texto(pintor, boton["texto"], y_texto, COLOR_TEXTO, negrita=True)
-                self._texto(pintor, boton["detalle"], y_detalle, COLOR_DETALLE)
+                ancho = max(80.0, 2 * (ap["radio"] - ap["abierto"]) - 4)
+                dibujar_texto(pintor, boton["texto"], QtCore.QRectF(-ancho / 2, y_texto - 10, ancho, 20),
+                              COLOR_TEXTO, negrita=True)
+                dibujar_texto(pintor, boton["detalle"], QtCore.QRectF(-ancho / 2, y_detalle - 10, ancho, 20),
+                              COLOR_DETALLE)
         pintor.end()
-
-    def _dibujar_icono(self, pintor, boton, x, y, r, a):
-        tamano = min(_TAM_ICONO, r * 1.25)
-        mapa = self._icono(boton, _TAM_ICONO)
-        pintor.save()
-        pintor.setOpacity(self.apariencia["opacidad"] * a)
-        if mapa is not None:
-            rect = QtCore.QRectF(x - tamano / 2, y - tamano / 2, tamano, tamano)
-            pintor.drawPixmap(rect, mapa, QtCore.QRectF(mapa.rect()))
-        elif boton["texto"]:
-            fuente = QtGui.QFont(self.font())
-            fuente.setPixelSize(max(8, int(r * 0.9)))
-            fuente.setBold(True)
-            pintor.setFont(fuente)
-            pintor.setPen(QtGui.QColor(20, 20, 20))
-            pintor.drawText(QtCore.QRectF(x - r, y - r, 2 * r, 2 * r), Qt.AlignCenter,
-                            boton["texto"][:1].upper())
-        pintor.restore()
-
-    def _texto(self, pintor, texto, y, color, negrita=False):
-        if not texto:
-            return
-        fuente = QtGui.QFont(self.font())
-        fuente.setPixelSize(12)
-        fuente.setBold(negrita)
-        pintor.setFont(fuente)
-        ancho = max(80.0, 2 * (self.apariencia["radio"] - self.apariencia["abierto"]) - 4)
-        rect = QtCore.QRectF(-ancho / 2, y - 10, ancho, 20)
-        metrica = QtGui.QFontMetrics(fuente)
-        texto = metrica.elidedText(texto, Qt.ElideRight, int(ancho))
-        pintor.setPen(COLOR_SOMBRA)
-        pintor.drawText(rect.translated(0, 1), Qt.AlignCenter, texto)
-        pintor.setPen(color)
-        pintor.drawText(rect, Qt.AlignCenter, texto)

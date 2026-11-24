@@ -23,6 +23,22 @@ TRAZOS = {
     "uv": "M4 4h16v16H4z M4 12h16 M12 4v16",
     "llave": "M3 12h10 M5 12v4 M8 12v3 M13 12a4 4 0 1 0 8 0a4 4 0 1 0 -8 0",
     "codigo": "M8 7l-5 5 5 5 M16 7l5 5-5 5 M14 4l-4 16",
+    "grafica": "M3 20h18 M3 4v16 M5 17c4 0 5-10 8.5-10S17 13 21 13",
+    "fotogramas": "M4 6h16v12H4z M8 6v12 M12 6v12 M16 6v12",
+    "play": "M7 5l12 7-12 7z",
+    "inicio": "M6 5v14 M18 5l-9 7 9 7z",
+    "hornear": "M5 10h14v9H5z M5 14h14 M9 4.5v3 M12 4v3.5 M15 4.5v3",
+    "engranaje": "M12 9a3 3 0 1 0 0 6a3 3 0 1 0 0-6z M12 2.5v3 M12 18.5v3 M2.5 12h3 M18.5 12h3 M5.3 5.3l2.1 2.1 M16.6 16.6l2.1 2.1 M5.3 18.7l2.1-2.1 M16.6 7.4l2.1-2.1",
+    "cielo": "M3 16a9 9 0 0 1 18 0z M12 7V4 M5.6 9.6L3.5 7.5 M18.4 9.6l2.1-2.1",
+    "plano": "M3 15l9-5 9 5-9 5z M12 4v6",
+    "desplegar": "M4 4h7v7H4z M13 13h7v7h-7z M11 7.5h5v5.5",
+    "organizar": "M4 4h7v7H4z M13 4h7v4h-7z M13 10h7v10h-7z M4 13h7v7H4z",
+    "ojo": "M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z M9 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0",
+    "estrella": "M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z",
+    "malla": "M4 4h16v16H4z M4 10h16 M4 16h16 M10 4v16 M16 4v16",
+    "lapiz": "M4 20l1-5L16 4l4 4L9 19z M14 6l4 4",
+    "carpeta": "M3 6h6l2 2h10v11H3z",
+    "papelera": "M4 7h16 M9 7V4h6v3 M6 7l1 13h10l1-13",
 }
 
 _SVG = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" '

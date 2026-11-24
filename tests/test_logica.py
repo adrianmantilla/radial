@@ -21,6 +21,11 @@ from radial import iconos  # noqa: E402
 from radial import radiales as rd  # noqa: E402
 import instalar  # noqa: E402
 
+# Textos de los deslizadores de Ajustes (el módulo importa Qt, así que se copian aquí)
+DESLIZADORES_TEXTOS = (("radio", "ajustes_radio", 1, "px"), ("punto", "ajustes_punto", 2, "px"),
+                       ("abierto", "ajustes_abierto", 1, "px"), ("pill_boton", "ajustes_pill_boton", 1, "px"),
+                       ("opacidad", "ajustes_opacidad", 100, "%"))
+
 
 class PruebaDetector(unittest.TestCase):
     def test_dos_tab_rapidos(self):
@@ -207,9 +212,15 @@ class PruebaTextos(unittest.TestCase):
             for nombre in archivos:
                 if nombre.endswith(".py") and "tests" not in carpeta:
                     with open(os.path.join(carpeta, nombre), encoding="utf-8") as f:
-                        usadas |= set(re.findall(r'\bt\("([a-z0-9_]+)"', f.read()))
+                        usadas |= set(re.findall(r'\bt\("([a-z0-9_]+)"\s*[,)]', f.read()))
                         f.seek(0)
                         usadas |= set(re.findall(r'_proximamente\("([a-z0-9_]+)"', f.read()))
+        # Claves que se montan con una variable
+        usadas |= {"tipo_" + tipo for tipo in ("comando", "estante", "python", "mel", "vacio")}
+        usadas |= {"forma_" + forma for forma in aj.FORMAS}
+        usadas |= {"forma_pill_horizontal", "forma_pill_vertical", "comando_anotacion",
+                   "comando_configurar_anotacion"}
+        usadas |= {texto for _, texto, _, _ in DESLIZADORES_TEXTOS}
         faltan = usadas - i18n.claves()
         self.assertFalse(faltan, "faltan textos: {}".format(sorted(faltan)))
 
@@ -220,8 +231,8 @@ class PruebaTextos(unittest.TestCase):
 
 class PruebaInstalador(unittest.TestCase):
     def test_modulo(self):
-        texto = instalar.contenido_mod("C:\\Users\\Ana\\Plugins\\Radial", "0.1.0")
-        self.assertTrue(texto.startswith("+ Radial 0.1.0 C:/Users/Ana/Plugins/Radial\n"))
+        texto = instalar.contenido_mod("C:\\Users\\Ana\\Plugins\\Radial", "1.0.0")
+        self.assertTrue(texto.startswith("+ Radial 1.0.0 C:/Users/Ana/Plugins/Radial\n"))
         self.assertIn("scripts: scripts", texto)
         self.assertIn("plug-ins: plug-ins", texto)
 

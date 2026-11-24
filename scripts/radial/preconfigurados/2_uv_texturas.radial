@@ -1,0 +1,55 @@
+{
+  "formato": 1,
+  "nombre": "UV y texturas",
+  "botones": [
+    {
+      "texto": "Editor",
+      "detalle": "de UV",
+      "icono": "uv",
+      "tipo": "comando",
+      "accion": "TextureViewWindow"
+    },
+    {
+      "texto": "Proyección",
+      "detalle": "automática",
+      "icono": "cubo",
+      "tipo": "mel",
+      "accion": "polyAutoProjection;"
+    },
+    {
+      "texto": "Proyección",
+      "detalle": "plana",
+      "icono": "plano",
+      "tipo": "mel",
+      "accion": "polyPlanarProjection -md b;"
+    },
+    {
+      "texto": "Desplegar",
+      "detalle": "UV",
+      "icono": "desplegar",
+      "tipo": "mel",
+      "accion": "unfold -i 5000 -ss 0.001 -gb 0 -gmb 0.5 -pub 0 -ps 0 -oa 0 -us off;"
+    },
+    {
+      "texto": "Organizar",
+      "detalle": "UV",
+      "icono": "organizar",
+      "tipo": "mel",
+      "accion": "polyLayoutUV -l 2 -sc 1 -rbf 1 -fr 1 -ps 0.2;"
+    },
+    {
+      "texto": "Hypershade",
+      "detalle": "",
+      "icono": "hypershade",
+      "tipo": "comando",
+      "accion": "HypershadeWindow"
+    }
+  ],
+  "apariencia": {
+    "radio": 84,
+    "punto": 5,
+    "abierto": 21,
+    "opacidad": 1.0,
+    "pill_boton": 32
+  }
+}

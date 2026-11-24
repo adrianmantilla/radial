@@ -16,7 +16,7 @@ except ImportError:  # pragma: no cover
         QtSvg = None
 
 __all__ = ["QtCore", "QtGui", "QtWidgets", "QtSvg", "shiboken", "posicion_global", "posicion_local", "sigue_vivo",
-           "ventana_maya"]
+           "destruir", "ventana_maya"]
 
 
 def posicion_global(evento):
@@ -39,6 +39,15 @@ def sigue_vivo(objeto):
         return objeto is not None and shiboken.isValid(objeto)
     except Exception:
         return False
+
+
+def destruir(objeto):
+    """Borra ya el objeto de Qt (no con deleteLater, que puede llegar tarde y romper Maya)."""
+    if sigue_vivo(objeto):
+        try:
+            shiboken.delete(objeto)
+        except Exception:
+            pass
 
 
 def ventana_maya():

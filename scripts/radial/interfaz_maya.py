@@ -1,4 +1,4 @@
-"""Une el plugin con Maya: menú Radial de la barra, menú flotante y doble Tab."""
+"""Une el plugin con Maya: menú Radial de la barra, menú flotante, ventanas y doble Tab."""
 
 import os
 import platform
@@ -7,22 +7,30 @@ from maya import cmds
 
 import radial
 from radial import ajustes as aj
+from radial import detector_tab as dt
 from radial import radiales as rd
+from radial.biblioteca import Biblioteca
 from radial.i18n import t
-from radial.qt import QtCore, QtGui, sigue_vivo, ventana_maya
+from radial.qt import QtCore, QtGui, destruir, sigue_vivo, ventana_maya
 
 MENU = "RadialMenu"
 MENU_RADIALES = "RadialMenuRadiales"
+MENU_FORMA = "RadialMenuForma"
 COMANDO_ALTERNAR = "RadialMostrarOcultar"
-PREFIJO_PRECONFIGURADO = "pre:"
+COMANDO_CONFIGURAR = "RadialConfigurar"
 
-_estado = {"menu": None, "filtro": None, "ajustes": None, "radial": None}
+_estado = {"menu": None, "filtro": None, "ajustes": None, "biblioteca": None,
+           "configurador": None, "ventana_ajustes": None, "gestor": None}
 
 
-# --- Ajustes y radial activo -----------------------------------------------
+# --- Ajustes y biblioteca -------------------------------------------------------
 
 def carpeta_preferencias():
     return os.path.join(cmds.internalVar(userAppDir=True), "radial")
+
+
+def carpeta_mios():
+    return os.path.join(carpeta_preferencias(), "radiales")
 
 
 def ajustes():
@@ -31,75 +39,192 @@ def ajustes():
     return _estado["ajustes"]
 
 
-def _cargar_radial_activo():
-    activo = ajustes().radial_activo or ""
-    if activo.startswith(PREFIJO_PRECONFIGURADO):
-        identificador = activo[len(PREFIJO_PRECONFIGURADO):]
-        for nombre, ruta in rd.preconfigurados():
-            if nombre == identificador:
-                try:
-                    return rd.leer(ruta)
-                except rd.RadialNoValido as error:
-                    cmds.warning(t("radial_no_valido", ruta=ruta, error=error))
-    return rd.por_defecto()
+def biblioteca():
+    if _estado["biblioteca"] is None:
+        _estado["biblioteca"] = Biblioteca(ajustes(), carpeta_mios())
+    return _estado["biblioteca"]
 
 
 def radial_activo():
-    if _estado["radial"] is None:
-        _estado["radial"] = _cargar_radial_activo()
-    return _estado["radial"]
+    return biblioteca().activo
 
 
-def usar_preconfigurado(identificador):
-    for nombre, ruta in rd.preconfigurados():
-        if nombre == identificador:
-            _estado["radial"] = rd.leer(ruta)
-            ajustes().radial_activo = PREFIJO_PRECONFIGURADO + identificador
-            ajustes().guardar()
-            menu = _estado["menu"]
-            if sigue_vivo(menu):
-                menu.usar_radial(_estado["radial"])
-            print(t("radial_activo", nombre=_estado["radial"]["nombre"]))
-            return _estado["radial"]
-    return None
+def _nombre_activo():
+    bib = biblioteca()
+    return bib.nombre_de(bib.origen) or bib.activo["nombre"]
+
+
+def _ventana(clave):
+    ventana = _estado[clave]
+    return ventana if sigue_vivo(ventana) else None
+
+
+def _radial_cambiado():
+    """Repinta el menú y las ventanas abiertas tras cambiar de radial o editarlo."""
+    bib = biblioteca()
+    menu = _menu_flotante(crear=False)
+    if menu:
+        menu.usar_radial(bib.activo)
+    configurador = _ventana("configurador")
+    if configurador:
+        configurador.fijar_radial(bib.activo, bib.sin_guardar, _nombre_activo())
+        configurador.boton_guardar.setText(t("boton_guardar_como_nuevo") if bib.es_preconfigurado
+                                           else t("boton_guardar"))
+    ventana_ajustes = _ventana("ventana_ajustes")
+    if ventana_ajustes:
+        ventana_ajustes.fijar(bib.activo["apariencia"], ajustes().forma, ajustes().pill_vertical,
+                              ajustes().ventana_ms)
+    gestor = _ventana("gestor")
+    if gestor:
+        gestor.refrescar()
+
+
+def _preguntar(titulo, mensaje, si, no):
+    respuesta = cmds.confirmDialog(title=titulo, message=mensaje, button=[si, no], defaultButton=si,
+                                   cancelButton=no, dismissString=no)
+    return respuesta == si
+
+
+def _descartar_cambios_si_hace_falta():
+    if not biblioteca().sin_guardar:
+        return True
+    return _preguntar(t("menu_titulo"), t("descartar_pregunta", nombre=_nombre_activo()),
+                      t("boton_descartar"), t("boton_cancelar"))
+
+
+def usar_radial(identificador):
+    if identificador == biblioteca().origen or not _descartar_cambios_si_hace_falta():
+        return
+    try:
+        radial_nuevo = biblioteca().usar(identificador)
+    except rd.RadialNoValido as error:
+        cmds.warning(t("radial_no_valido", ruta=identificador, error=error))
+        return
+    _radial_cambiado()
+    print(t("radial_activo", nombre=radial_nuevo["nombre"]))
+
+
+def modificar_radial(radial_nuevo):
+    biblioteca().modificar(radial_nuevo)
+    _radial_cambiado()
+
+
+def guardar():
+    """Guarda los cambios en el radial propio; si es preconfigurado, como radial nuevo."""
+    if biblioteca().es_preconfigurado:
+        return guardar_como()
+    biblioteca().guardar_cambios()
+    _radial_cambiado()
+    print(t("guardado", nombre=_nombre_activo()))
+    return True
+
+
+def guardar_como():
+    base = _nombre_activo()
+    if biblioteca().es_preconfigurado:
+        base = t("nombre_mi_radial", nombre=base)
+    respuesta = cmds.promptDialog(title=t("guardar_como_titulo"), message=t("gestor_nombre"),
+                                  text=rd.nombre_libre(carpeta_mios(), base),
+                                  button=[t("boton_guardar"), t("boton_cancelar")],
+                                  defaultButton=t("boton_guardar"), cancelButton=t("boton_cancelar"),
+                                  dismissString=t("boton_cancelar"))
+    if respuesta != t("boton_guardar"):
+        return False
+    nombre = cmds.promptDialog(query=True, text=True).strip()
+    if not nombre:
+        return False
+    nuevo = biblioteca().guardar_como(nombre)
+    _radial_cambiado()
+    print(t("guardado", nombre=nuevo["nombre"]))
+    return True
+
+
+def descartar_cambios():
+    if not biblioteca().sin_guardar:
+        return
+    if _preguntar(t("menu_titulo"), t("descartar_pregunta", nombre=_nombre_activo()),
+                  t("boton_descartar"), t("boton_cancelar")):
+        biblioteca().restaurar()
+        _radial_cambiado()
+
+
+def importar():
+    rutas = cmds.fileDialog2(fileFilter=t("filtro_radial_maya"), fileMode=1, caption=t("importar_titulo"),
+                             okCaption=t("boton_importar"))
+    if not rutas or not _descartar_cambios_si_hace_falta():
+        return
+    try:
+        nuevo = biblioteca().importar(rutas[0])
+    except (rd.RadialNoValido, OSError) as error:
+        cmds.warning(t("radial_no_valido", ruta=rutas[0], error=error))
+        return
+    _radial_cambiado()
+    print(t("importado", nombre=nuevo["nombre"]))
+
+
+def exportar():
+    rutas = cmds.fileDialog2(fileFilter=t("filtro_radial_maya"), fileMode=0, caption=t("exportar_titulo"),
+                             okCaption=t("boton_exportar"),
+                             startingDirectory=rd.nombre_de_archivo(_nombre_activo()) + rd.EXTENSION)
+    if not rutas:
+        return
+    try:
+        ruta = biblioteca().exportar(rutas[0])
+    except (rd.RadialNoValido, OSError) as error:
+        cmds.warning(t("gestor_error", error=error))
+        return
+    print(t("exportado", ruta=ruta))
 
 
 # --- Menú flotante ------------------------------------------------------------
 
-def _menu_radial(crear=True):
-    from radial.menu_radial import MenuRadial
+def _menu_flotante(crear=True):
     menu = _estado["menu"]
-    if not sigue_vivo(menu) and crear:
-        menu = MenuRadial(ventana_maya(), al_ejecutar=_al_ejecutar, al_mover=_al_mover,
-                          al_configurar=_al_configurar)
+    if not sigue_vivo(menu):
+        menu = None
+    if menu is None and crear:
+        if ajustes().forma == "pill":
+            from radial.menu_pill import MenuPill
+            menu = MenuPill(ventana_maya(), al_ejecutar=_al_ejecutar, al_mover=_al_mover,
+                            al_configurar=abrir_configurador, vertical=ajustes().pill_vertical)
+        else:
+            from radial.menu_radial import MenuRadial
+            menu = MenuRadial(ventana_maya(), al_ejecutar=_al_ejecutar, al_mover=_al_mover,
+                              al_configurar=abrir_configurador)
         menu.usar_radial(radial_activo())
         _estado["menu"] = menu
-    return menu if sigue_vivo(menu) else None
+    return menu
+
+
+def _destruir_menu_flotante():
+    menu = _estado["menu"]
+    if sigue_vivo(menu):
+        menu.hide()
+        if getattr(menu, "etiqueta", None) is not None:
+            destruir(menu.etiqueta)
+        destruir(menu)
+    _estado["menu"] = None
 
 
 def visible():
-    menu = _menu_radial(crear=False)
+    menu = _menu_flotante(crear=False)
     return bool(menu and menu.isVisible())
-
-
-def _pantalla_en(punto):
-    return QtGui.QGuiApplication.screenAt(punto)
 
 
 def _ajustar_a_pantalla(centro, menu):
     """Mueve ``centro`` lo justo para que el menú quepa entero en su pantalla."""
-    pantalla = _pantalla_en(centro) or QtGui.QGuiApplication.primaryScreen()
+    pantalla = QtGui.QGuiApplication.screenAt(centro) or QtGui.QGuiApplication.primaryScreen()
     zona = pantalla.availableGeometry()
-    mitad = menu.width() // 2
-    x = max(zona.left() + mitad, min(zona.right() - mitad, centro.x()))
-    y = max(zona.top() + mitad, min(zona.bottom() - mitad, centro.y()))
+    mitad_x, mitad_y = menu.width() // 2, menu.height() // 2
+    x = max(zona.left() + mitad_x, min(zona.right() - mitad_x, centro.x()))
+    y = max(zona.top() + mitad_y, min(zona.bottom() - mitad_y, centro.y()))
     return QtCore.QPoint(x, y)
 
 
 def mostrar():
-    menu = _menu_radial()
+    menu = _menu_flotante()
     guardada = ajustes().posicion
-    if guardada is not None and _pantalla_en(QtCore.QPoint(*guardada)) is not None:
+    if guardada is not None and QtGui.QGuiApplication.screenAt(QtCore.QPoint(*guardada)) is not None:
         centro = QtCore.QPoint(*guardada)
     else:
         centro = QtGui.QCursor.pos()
@@ -109,16 +234,30 @@ def mostrar():
 
 
 def ocultar():
-    menu = _menu_radial(crear=False)
+    menu = _menu_flotante(crear=False)
     if menu:
         menu.hide()
 
 
 def alternar():
-    """Muestra u oculta el menú radial (lo mismo que el doble Tab)."""
+    """Muestra u oculta el menú (lo mismo que el doble Tab)."""
     if visible():
         ocultar()
     else:
+        mostrar()
+
+
+def cambiar_forma(forma, vertical=None):
+    """Cambia entre el radial y la pill (horizontal o vertical) sin perder la posición."""
+    vertical = ajustes().pill_vertical if vertical is None else bool(vertical)
+    if forma == ajustes().forma and vertical == ajustes().pill_vertical:
+        return
+    estaba_visible = visible()
+    ajustes().forma = forma
+    ajustes().pill_vertical = vertical
+    ajustes().guardar()
+    _destruir_menu_flotante()
+    if estaba_visible:
         mostrar()
 
 
@@ -141,8 +280,92 @@ def _al_mover(centro):
     ajustes().guardar()
 
 
-def _al_configurar():
-    _proximamente("funcion_configurador")
+# --- Ventanas -------------------------------------------------------------------
+
+def _traer(ventana):
+    ventana.show()
+    ventana.raise_()
+    ventana.activateWindow()
+    return ventana
+
+
+def abrir_configurador():
+    ventana = _ventana("configurador")
+    if ventana:
+        bib = biblioteca()
+        ventana.fijar_radial(bib.activo, bib.sin_guardar, _nombre_activo())
+        if not visible():
+            mostrar()
+        return _traer(ventana)
+    from radial.configurador import Configurador
+    from radial.fuentes_maya import FuentesMaya
+    bib = biblioteca()
+    ventana = Configurador(bib.activo, FuentesMaya(), al_cambiar=modificar_radial, al_guardar=guardar,
+                           al_restaurar=descartar_cambios, puede_guardar=not bib.es_preconfigurado,
+                           padre=ventana_maya())
+    ventana.fijar_cabecera(_nombre_activo(), bib.sin_guardar)
+    _estado["configurador"] = ventana
+    if not visible():
+        mostrar()
+    return _traer(ventana)
+
+
+def abrir_ajustes():
+    ventana = _ventana("ventana_ajustes")
+    if ventana:
+        ventana.fijar(radial_activo()["apariencia"], ajustes().forma, ajustes().pill_vertical,
+                      ajustes().ventana_ms)
+        if not visible():
+            mostrar()
+        return _traer(ventana)
+    from radial.ventana_ajustes import VentanaAjustes
+    ventana = VentanaAjustes(radial_activo()["apariencia"], ajustes().forma, ajustes().pill_vertical,
+                             ajustes().ventana_ms, al_apariencia=_apariencia_cambiada,
+                             al_forma=cambiar_forma, al_velocidad=_velocidad_cambiada, padre=ventana_maya())
+    _estado["ventana_ajustes"] = ventana
+    if not visible():
+        mostrar()
+    return _traer(ventana)
+
+
+def _apariencia_cambiada(apariencia):
+    nuevo = dict(radial_activo())
+    nuevo["apariencia"] = apariencia
+    biblioteca().modificar(nuevo)
+    menu = _menu_flotante(crear=False)
+    if menu:
+        menu.usar_radial(biblioteca().activo)
+    configurador = _ventana("configurador")
+    if configurador:
+        configurador.fijar_cabecera(_nombre_activo(), True)
+
+
+def _velocidad_cambiada(ms):
+    ajustes().ventana_ms = ms
+    ajustes().guardar()
+    filtro = _estado["filtro"]
+    if filtro is not None:
+        filtro.detector.ventana_ms = dt.limitar_ventana(ms)
+
+
+def abrir_gestor():
+    ventana = _ventana("gestor")
+    if ventana:
+        ventana.refrescar()
+        return _traer(ventana)
+    from radial.gestor_radiales import GestorRadiales
+    ventana = GestorRadiales(biblioteca(), al_cambiar=_radial_cambiado, padre=ventana_maya())
+    _estado["gestor"] = ventana
+    return _traer(ventana)
+
+
+def _cerrar_ventanas():
+    for clave in ("configurador", "ventana_ajustes", "gestor"):
+        ventana = _ventana(clave)
+        if ventana:
+            ventana.close()
+            destruir(ventana)
+        _estado[clave] = None
 
 
 # --- Doble Tab --------------------------------------------------------------
@@ -158,14 +381,13 @@ def _sobre_visor():
 
 def _puede_contar(es_segundo):
     from radial.filtro_teclado import escribiendo
-    if visible():
-        # Con el menú a la vista, el doble Tab lo oculta desde cualquier sitio
-        # salvo mientras se escribe.
-        return es_segundo or not escribiendo()
-    if not _sobre_visor():
+    if es_segundo:
+        # El primer Tab ya pasó las comprobaciones; puede haber movido el foco a un campo.
+        return True
+    if escribiendo():
         return False
-    # El primer Tab puede mover el foco a un campo; solo cuenta dónde estaba al principio.
-    return es_segundo or not escribiendo()
+    # Con el menú a la vista, el doble Tab lo oculta desde cualquier sitio.
+    return visible() or _sobre_visor()
 
 
 def _instalar_filtro():
@@ -180,19 +402,22 @@ def _quitar_filtro():
     filtro = _estado["filtro"]
     if filtro is not None:
         filtro.quitar()
-        if sigue_vivo(filtro):
-            filtro.deleteLater()
+        destruir(filtro)
     _estado["filtro"] = None
 
 
-def _crear_comando():
-    """Comando para el Editor de atajos, por si alguien prefiere otra tecla."""
-    codigo = "from radial import interfaz_maya; interfaz_maya.alternar()"
-    if cmds.runTimeCommand(COMANDO_ALTERNAR, exists=True):
-        cmds.runTimeCommand(COMANDO_ALTERNAR, edit=True, command=codigo, commandLanguage="python")
-    else:
-        cmds.runTimeCommand(COMANDO_ALTERNAR, annotation=t("comando_anotacion"), category="Custom Scripts",
-                            command=codigo, commandLanguage="python")
+def _crear_comandos():
+    """Comandos para el Editor de atajos (categoría Custom Scripts)."""
+    for nombre, codigo, clave in (
+            (COMANDO_ALTERNAR, "from radial import interfaz_maya; interfaz_maya.alternar()", "comando_anotacion"),
+            (COMANDO_CONFIGURAR, "from radial import interfaz_maya; interfaz_maya.abrir_configurador()",
+             "comando_configurar_anotacion")):
+        if cmds.runTimeCommand(nombre, exists=True):
+            cmds.runTimeCommand(nombre, edit=True, command=codigo, commandLanguage="python",
+                                annotation=t(clave))
+        else:
+            cmds.runTimeCommand(nombre, annotation=t(clave), category="Custom Scripts", command=codigo,
+                                commandLanguage="python")
 
 
 # --- Comprobar --------------------------------------------------------------
@@ -218,12 +443,12 @@ def comprobar(mostrar_dialogo=True):
         lineas.append(t("comprobar_tab_aviso"))
         bien = False
 
-    activo = radial_activo()
-    lineas.append(t("comprobar_radial", nombre=activo["nombre"]))
-    for i, boton in enumerate(activo["botones"]):
+    lineas.append(t("comprobar_radial", nombre=_nombre_activo(), forma=t("forma_" + ajustes().forma)))
+    for i, boton in enumerate(radial_activo()["botones"]):
         if boton["tipo"] == "comando" and not acciones.comando_existe(boton["accion"]):
             lineas.append(t("comprobar_boton_aviso", numero=i + 1, comando=boton["accion"]))
             bien = False
+    lineas.append(t("comprobar_carpeta", ruta=carpeta_mios(), n=len(biblioteca().mios())))
 
     lineas.append("")
     lineas.append(t("comprobar_ok") if bien else t("comprobar_avisos"))
@@ -237,9 +462,8 @@ def comprobar(mostrar_dialogo=True):
 
 # --- Menú de la barra ---------------------------------------------------------
 
-def _proximamente(clave_funcion):
-    cmds.confirmDialog(title=t("menu_titulo"), message=t("proximamente", funcion=t(clave_funcion)),
-                       button=[t("boton_aceptar")])
+def _ayuda():
+    cmds.confirmDialog(title=t("menu_ayuda"), message=t("ayuda_texto"), button=[t("boton_aceptar")])
 
 
 def _acerca():
@@ -248,37 +472,65 @@ def _acerca():
 
 
 def _llenar_radiales(*_):
+    bib = biblioteca()
+    origen = bib.origen
     cmds.menu(MENU_RADIALES, edit=True, deleteAllItems=True)
     cmds.setParent(MENU_RADIALES, menu=True)
-    activo = ajustes().radial_activo or ""
-    hay_activo = any(activo == PREFIJO_PRECONFIGURADO + n for n, _ in rd.preconfigurados())
-    cmds.menuItem(divider=True, dividerLabel=t("menu_preconfigurados"))
     cmds.radioMenuItemCollection()
-    for indice, (nombre, ruta) in enumerate(rd.preconfigurados()):
-        try:
-            titulo = rd.leer(ruta)["nombre"]
-        except rd.RadialNoValido:
-            continue
-        marcado = activo == PREFIJO_PRECONFIGURADO + nombre or (not hay_activo and indice == 0)
-        cmds.menuItem(label=titulo, radioButton=marcado,
-                      command=lambda *_, n=nombre: usar_preconfigurado(n))
+    cmds.menuItem(divider=True, dividerLabel=t("menu_preconfigurados"))
+    for identificador, nombre in bib.preconfigurados():
+        cmds.menuItem(label=nombre, radioButton=identificador == origen,
+                      command=lambda *_, i=identificador: usar_radial(i))
+    cmds.menuItem(divider=True, dividerLabel=t("menu_mis_radiales"))
+    mios = bib.mios()
+    if not mios:
+        cmds.menuItem(label=t("menu_sin_mios"), enable=False)
+    for identificador, nombre in mios:
+        cmds.menuItem(label=nombre, radioButton=identificador == origen,
+                      command=lambda *_, i=identificador: usar_radial(i))
     cmds.menuItem(divider=True)
-    cmds.menuItem(label=t("menu_guardar_cargar"), enable=False)
+    nombre = _nombre_activo()
+    if bib.es_preconfigurado:
+        cmds.menuItem(label=t("menu_guardar_cambios", nombre=nombre), enable=False)
+    else:
+        cmds.menuItem(label=t("menu_guardar_cambios", nombre=nombre), enable=bib.sin_guardar,
+                      command=lambda *_: guardar())
+    cmds.menuItem(label=t("menu_guardar_como"), command=lambda *_: guardar_como())
+    cmds.menuItem(label=t("menu_descartar"), enable=bib.sin_guardar, command=lambda *_: descartar_cambios())
+    cmds.menuItem(divider=True)
+    cmds.menuItem(label=t("menu_importar"), command=lambda *_: importar())
+    cmds.menuItem(label=t("menu_exportar"), command=lambda *_: exportar())
+    cmds.menuItem(label=t("menu_gestionar"), command=lambda *_: abrir_gestor())
+
+
+def _llenar_forma(*_):
+    cmds.menu(MENU_FORMA, edit=True, deleteAllItems=True)
+    cmds.setParent(MENU_FORMA, menu=True)
+    cmds.radioMenuItemCollection()
+    forma, vertical = ajustes().forma, ajustes().pill_vertical
+    for etiqueta, f, v in (("forma_radial", "radial", None), ("forma_pill_horizontal", "pill", False),
+                           ("forma_pill_vertical", "pill", True)):
+        marcado = forma == f and (v is None or v == vertical)
+        cmds.menuItem(label=t(etiqueta), radioButton=marcado,
+                      command=lambda *_, f=f, v=v: cambiar_forma(f, v))
 
 
 def crear_menu():
     quitar_menu()
     cmds.menu(MENU, parent="MayaWindow", label=t("menu_titulo"), tearOff=True)
     cmds.menuItem(label=t("menu_alternar"), command=lambda *_: alternar())
-    cmds.menuItem(label=t("menu_configurar"), command=lambda *_: _proximamente("funcion_configurador"))
+    cmds.menuItem(label=t("menu_configurar"), command=lambda *_: abrir_configurador())
     cmds.menuItem(MENU_RADIALES, label=t("menu_radiales"), subMenu=True, tearOff=True,
                   postMenuCommand=_llenar_radiales)
     cmds.setParent("..", menu=True)
     cmds.menuItem(divider=True)
-    cmds.menuItem(label=t("menu_ajustes"), command=lambda *_: _proximamente("funcion_ajustes"))
+    cmds.menuItem(MENU_FORMA, label=t("menu_forma"), subMenu=True, postMenuCommand=_llenar_forma)
+    cmds.setParent("..", menu=True)
+    cmds.menuItem(label=t("menu_ajustes"), command=lambda *_: abrir_ajustes())
     cmds.menuItem(label=t("menu_centrar"), command=lambda *_: volver_a_centrar())
     cmds.menuItem(divider=True)
     cmds.menuItem(label=t("menu_comprobar"), command=lambda *_: comprobar())
+    cmds.menuItem(label=t("menu_ayuda"), command=lambda *_: _ayuda())
     cmds.menuItem(label=t("menu_acerca"), command=lambda *_: _acerca())
     return MENU
 
@@ -295,18 +547,16 @@ def iniciar():
     if cmds.about(batch=True):
         return
     crear_menu()
-    _crear_comando()
+    _crear_comandos()
     _instalar_filtro()
     print(t("iniciado", version=radial.__version__))
 
 
 def detener():
-    """Lo llama el plugin al descargarse: quita el filtro, el menú flotante y el de la barra."""
+    """Lo llama el plugin al descargarse: quita el filtro, las ventanas y los menús."""
     _quitar_filtro()
-    menu = _estado["menu"]
-    if sigue_vivo(menu):
-        menu.hide()
-        menu.deleteLater()
-    _estado.update(menu=None, radial=None, ajustes=None)
+    _cerrar_ventanas()
+    _destruir_menu_flotante()
+    _estado.update(ajustes=None, biblioteca=None)
     if not cmds.about(batch=True):
         quitar_menu()

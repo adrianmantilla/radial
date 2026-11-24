@@ -20,6 +20,9 @@ if QtWidgets is not None:
     from radial import radiales as rd
     from radial.filtro_teclado import FiltroTeclado
     from radial.menu_radial import MenuRadial
+    from radial.menu_pill import MenuPill
+    from radial.configurador import Configurador
+    from radial.ventana_ajustes import VentanaAjustes
 
     Qt = QtCore.Qt
     QEvent = QtCore.QEvent
@@ -208,6 +211,173 @@ class PruebaMenu(unittest.TestCase):
             self.menu._animar()
         imagen = self.menu.grab()
         self.assertFalse(imagen.isNull())
+
+
+
+class FuentesFalsas(object):
+    """Lo mínimo que el configurador pide a Maya."""
+
+    def __init__(self):
+        self.probados = []
+
+    def comandos(self):
+        return [("CenterPivot", "Menu items.Modify", "Center the pivot"),
+                ("DuplicateSpecialOptions", "Menu items.Edit", "Duplicate special"),
+                ("PolyExtrude", "Menu items.Mesh", "Extrude faces")]
+
+    def estantes(self):
+        return [("Poly", [{"texto": "Cubo", "detalle": "", "icono": "", "tipo": "mel",
+                           "accion": "polyCube;", "descripcion": "Crea un cubo"}])]
+
+    def iconos_maya(self, filtro="", limite=400):
+        return []
+
+    def probar(self, boton):
+        self.probados.append(boton)
+        return True
+
+
+def _clic(widget, punto, boton=None):
+    boton = Qt.LeftButton if boton is None else boton
+    for tipo in (QEvent.MouseMove, QEvent.MouseButtonPress, QEvent.MouseButtonRelease):
+        evento = QtGui.QMouseEvent(tipo, QtCore.QPointF(punto), QtCore.QPointF(widget.mapToGlobal(punto)),
+                                   Qt.NoButton if tipo == QEvent.MouseMove else boton,
+                                   Qt.NoButton if tipo == QEvent.MouseMove else boton, Qt.NoModifier)
+        APP.sendEvent(widget, evento)
+
+
+@unittest.skipIf(QtWidgets is None, "PySide6 no está instalado")
+class PruebaPill(unittest.TestCase):
+    def setUp(self):
+        self.ejecutados, self.movidos, self.configurar = [], [], []
+
+    def _pill(self, vertical):
+        pill = MenuPill(al_ejecutar=self.ejecutados.append, al_mover=self.movidos.append,
+                        al_configurar=lambda: self.configurar.append(1), vertical=vertical)
+        pill.usar_radial(rd.por_defecto())
+        pill.colocar(QtCore.QPoint(500, 400))
+        pill.show()
+        self.addCleanup(pill.close)
+        return pill
+
+    def _centro_boton(self, pill, i):
+        x, y, w, h = rd.geometria_pill(pill.apariencia, pill.vertical)[3][i]
+        return QtCore.QPoint(int(1 + x + w / 2), int(1 + y + h / 2))
+
+    def test_clic_y_etiqueta(self):
+        for vertical in (False, True):
+            pill = self._pill(vertical)
+            punto = self._centro_boton(pill, 4)
+            _clic(pill, punto)
+            self.assertEqual(self.ejecutados[-1], 4)
+            self.assertTrue(pill.etiqueta.isVisible())
+            self.assertEqual(pill.etiqueta.texto, "Hypershade")
+            pill.hide()
+            self.assertFalse(pill.etiqueta.isVisible())
+
+    def test_tamano_segun_orientacion(self):
+        h = self._pill(False)
+        v = self._pill(True)
+        self.assertGreater(h.width(), h.height())
+        self.assertEqual((h.width(), h.height()), (v.height(), v.width()))
+
+    def test_clic_derecho_en_agarre(self):
+        pill = self._pill(False)
+        _clic(pill, QtCore.QPoint(10, pill.height() // 2), Qt.RightButton)
+        self.assertEqual(self.configurar, [1])
+
+    def test_dibuja(self):
+        pill = self._pill(False)
+        pill._sobre = 0
+        for _ in range(6):
+            pill._animar()
+        self.assertFalse(pill.grab().isNull())
+
+
+@unittest.skipIf(QtWidgets is None, "PySide6 no está instalado")
+class PruebaConfigurador(unittest.TestCase):
+    def setUp(self):
+        self.cambios, self.guardados = [], []
+        self.fuentes = FuentesFalsas()
+        self.ventana = Configurador(rd.por_defecto(), self.fuentes, al_cambiar=self.cambios.append,
+                                    al_guardar=lambda: self.guardados.append(1))
+        self.addCleanup(self.ventana.close)
+
+    def test_muestra_el_primer_hueco(self):
+        self.assertEqual(self.ventana.texto.text(), "Duplicar")
+        self.assertEqual(self.ventana.huecos.count(), 6)
+
+    def test_editar_texto_avisa(self):
+        self.ventana.texto.setText("Clonar")
+        self.ventana.texto.textEdited.emit("Clonar")
+        self.assertEqual(self.cambios[-1]["botones"][0]["texto"], "Clonar")
+
+    def test_elegir_comando(self):
+        self.ventana.huecos.setCurrentRow(1)
+        self.ventana.buscar_comando.setText("extrude")
+        self.ventana._filtrar_comandos()
+        self.assertEqual(self.ventana.lista_comandos.topLevelItemCount(), 1)
+        self.ventana.lista_comandos.setCurrentItem(self.ventana.lista_comandos.topLevelItem(0))
+        boton = self.cambios[-1]["botones"][1]
+        self.assertEqual((boton["tipo"], boton["accion"]), ("comando", "PolyExtrude"))
+
+    def test_codigo_python(self):
+        self.ventana.huecos.setCurrentRow(2)
+        self.ventana.tipo.setCurrentIndex(2)  # Python
+        self.ventana.codigo_python.setPlainText("print('hola')")
+        boton = self.cambios[-1]["botones"][2]
+        self.assertEqual((boton["tipo"], boton["accion"]), ("python", "print('hola')"))
+        self.ventana.boton_probar.click()
+        self.assertEqual(self.fuentes.probados[-1]["accion"], "print('hola')")
+
+    def test_vaciar_hueco(self):
+        self.ventana.huecos.setCurrentRow(5)
+        self.ventana.tipo.setCurrentIndex(4)
+        self.assertEqual(self.cambios[-1]["botones"][5]["tipo"], "vacio")
+
+    def test_copiar_de_estante(self):
+        self.ventana.huecos.setCurrentRow(3)
+        self.ventana.tipo.setCurrentIndex(1)
+        self.ventana._copiar_de_estante(self.ventana.lista_estante.item(0))
+        boton = self.cambios[-1]["botones"][3]
+        self.assertEqual((boton["texto"], boton["tipo"], boton["accion"]), ("Cubo", "mel", "polyCube;"))
+        self.assertEqual(self.ventana.tipo.currentIndex(), 3)  # muestra la página MEL
+
+    def test_icono(self):
+        self.ventana._cambiar(icono="estrella")
+        self.assertEqual(self.cambios[-1]["botones"][0]["icono"], "estrella")
+
+    def test_guardar(self):
+        self.ventana.boton_guardar.click()
+        self.assertEqual(self.guardados, [1])
+
+
+@unittest.skipIf(QtWidgets is None, "PySide6 no está instalado")
+class PruebaVentanaAjustes(unittest.TestCase):
+    def test_cambios_en_vivo(self):
+        apariencias, formas, velocidades = [], [], []
+        ventana = VentanaAjustes(rd.normalizar_apariencia({}), "radial", False, 250,
+                                 al_apariencia=apariencias.append,
+                                 al_forma=lambda f, v: formas.append((f, v)),
+                                 al_velocidad=velocidades.append)
+        self.addCleanup(ventana.close)
+        ventana.deslizadores["radio"].barra.setValue(120)
+        self.assertEqual(apariencias[-1]["radio"], 120)
+        ventana.deslizadores["opacidad"].barra.setValue(55)
+        self.assertAlmostEqual(apariencias[-1]["opacidad"], 0.55)
+        ventana.deslizadores["punto"].barra.setValue(13)
+        self.assertEqual(apariencias[-1]["punto"], 6.5)
+        self.assertFalse(ventana.deslizadores["pill_boton"].isEnabled())
+        ventana.forma_pill.setChecked(True)
+        self.assertEqual(formas[-1], ("pill", False))
+        self.assertTrue(ventana.deslizadores["pill_boton"].isEnabled())
+        ventana.vertical.setChecked(True)
+        self.assertEqual(formas[-1], ("pill", True))
+        ventana.velocidad.barra.setValue(320)
+        self.assertEqual(velocidades[-1], 320)
+        ventana._restaurar()
+        self.assertEqual(apariencias[-1]["radio"], 84)
+        self.assertEqual(velocidades[-1], 250)
 
 
 if __name__ == "__main__":

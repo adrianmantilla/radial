@@ -1,4 +1,4 @@
-"""Ajustes del usuario: radial activo, posición del menú y velocidad del doble Tab.
+"""Ajustes del usuario: radial activo, forma, posición del menú y velocidad del doble Tab.
 
 Se guardan en ``<preferencias de Maya>/radial/ajustes.json``. Este módulo no
 depende de Maya; la carpeta se la pasa quien lo usa.
@@ -8,6 +8,9 @@ import json
 import os
 
 from radial import detector_tab
+from radial import radiales as rd
+
+FORMAS = ("radial", "pill")
 
 _ARCHIVO = "ajustes.json"
 
@@ -67,3 +70,44 @@ class Ajustes(object):
     @radial_activo.setter
     def radial_activo(self, valor):
         self.datos["radial_activo"] = valor
+
+    # Forma del menú: «radial» (anillo de puntos) o «pill» (cápsula)
+    @property
+    def forma(self):
+        valor = self.datos.get("forma")
+        return valor if valor in FORMAS else FORMAS[0]
+
+    @forma.setter
+    def forma(self, valor):
+        self.datos["forma"] = valor if valor in FORMAS else FORMAS[0]
+
+    @property
+    def pill_vertical(self):
+        return self.datos.get("pill_vertical") is True
+
+    @pill_vertical.setter
+    def pill_vertical(self, valor):
+        self.datos["pill_vertical"] = bool(valor)
+
+    # Copia de trabajo del radial activo, con los cambios aún sin guardar
+    @property
+    def radial_actual(self):
+        try:
+            return rd.normalizar(self.datos.get("radial_actual"))
+        except rd.RadialNoValido:
+            return None
+
+    @radial_actual.setter
+    def radial_actual(self, radial):
+        if radial is None:
+            self.datos.pop("radial_actual", None)
+        else:
+            self.datos["radial_actual"] = rd.normalizar(radial)
+
+    @property
+    def sin_guardar(self):
+        return self.datos.get("sin_guardar") is True
+
+    @sin_guardar.setter
+    def sin_guardar(self, valor):
+        self.datos["sin_guardar"] = bool(valor)

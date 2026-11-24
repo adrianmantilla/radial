@@ -1,4 +1,4 @@
-"""Prueba de las fases 0 y 1 dentro de Maya, sin interfaz (herramienta de desarrollo).
+"""Prueba de Radial 1.0 dentro de Maya, sin interfaz (herramienta de desarrollo).
 
 Desde la terminal, con el mayapy de cada versión:
 
@@ -6,8 +6,9 @@ Desde la terminal, con el mayapy de cada versión:
     "C:\\Program Files\\Autodesk\\Maya2027\\bin\\mayapy.exe" herramientas\\prueba_maya.py
 
 No toca tus preferencias de Maya. Comprueba que el plugin carga, que todos los
-comandos de los radiales preconfigurados existen en esta versión de Maya y que
-los botones se ejecutan. El doble Tab y el menú flotante necesitan la interfaz
+comandos de los radiales preconfigurados existen en esta versión de Maya, que
+los botones se ejecutan, que la lista de comandos y los iconos de Maya se leen
+y que guardar, exportar e importar radiales funciona. El doble Tab y el menú flotante necesitan la interfaz
 de Maya: pruébalos abriendo Maya normalmente.
 Termina con «RESULTADO: OK» o con la lista de fallos.
 """
@@ -67,6 +68,36 @@ def main():
               "un botón con error avisa sin romper nada")
     comprobar(not acciones.ejecutar({"texto": "No existe", "tipo": "comando", "accion": "ComandoQueNoExiste"}),
               "un comando inexistente avisa sin romper nada")
+
+    # Fuentes del configurador
+    from radial import fuentes_maya
+    fuentes = fuentes_maya.FuentesMaya()
+    comandos = fuentes.comandos()
+    comprobar(len(comandos) > 500, "la lista de comandos del Editor de atajos se lee ({})".format(len(comandos)))
+    comprobar(any(c[0] == "CenterPivot" for c in comandos), "CenterPivot está en la lista de comandos")
+    try:
+        iconos = fuentes.iconos_maya("polyCube")
+    except RuntimeError:
+        iconos = []
+    comprobar(bool(iconos), "los iconos de Maya se encuentran ({})".format(len(iconos)))
+
+    # Biblioteca: guardar, exportar e importar en una carpeta temporal
+    import tempfile
+    from radial import ajustes as aj, biblioteca as bib
+    with tempfile.TemporaryDirectory() as tmp:
+        b = bib.Biblioteca(aj.Ajustes(tmp), os.path.join(tmp, "radiales"))
+        radial = b.activo
+        radial["botones"][0]["texto"] = "Prueba"
+        b.modificar(radial)
+        comprobar(not b.guardar_cambios(), "un preconfigurado no se sobrescribe")
+        b.guardar_como("Mi prueba")
+        comprobar(b.origen.startswith("mio:") and not b.sin_guardar, "guardar como nuevo radial")
+        ruta = os.path.join(tmp, "exportado.radial")
+        b.exportar(ruta)
+        comprobar(os.path.isfile(ruta), "exportar crea el archivo .radial")
+        b.importar(ruta)
+        comprobar(b.activo["nombre"].startswith("Mi prueba") and len(b.mios()) == 2,
+                  "importar el archivo exportado")
 
     cmds.unloadPlugin("radial_plugin")
     comprobar(not cmds.pluginInfo("radial_plugin", query=True, loaded=True), "el plugin se descarga")

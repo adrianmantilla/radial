@@ -10,7 +10,8 @@ Un archivo ``.radial`` tiene esta forma::
          "tipo": "comando", "accion": "DuplicateSpecialOptions"},
         ...  (seis en total)
       ],
-      "apariencia": {"radio": 84, "punto": 5, "abierto": 21, "opacidad": 1.0}
+      "apariencia": {"radio": 84, "punto": 5, "abierto": 21, "opacidad": 1.0,
+                     "pill_boton": 32}
     }
 
 ``tipo`` puede ser ``comando`` (comando de Maya, el mismo nombre que usa el
@@ -21,6 +22,8 @@ Maya; lee, comprueba y calcula la geometría del menú.
 import json
 import math
 import os
+import re
+import unicodedata
 
 FORMATO = 1
 NUM_BOTONES = 6
@@ -34,6 +37,7 @@ APARIENCIA = {
     "punto": (3.0, 9.0, 5.0),
     "abierto": (15, 30, 21),
     "opacidad": (0.4, 1.0, 1.0),
+    "pill_boton": (24, 44, 32),  # tamaño de los botones en la forma pill
 }
 RADIO_CENTRO = 15  # el círculo del centro, desde donde se arrastra
 
@@ -162,3 +166,131 @@ def que_hay_en(x, y, apariencia):
     if math.hypot(x, y) <= RADIO_CENTRO + 4:
         return "centro"
     return None
+
+
+# --- Forma pill ---------------------------------------------------------------
+# La pill es una cápsula con un agarre, una raya y los seis botones en fila.
+
+PILL_MARGEN = 5
+PILL_AGARRE = 22
+PILL_SEPARACION = 4
+PILL_RAYA = 9
+
+
+def geometria_pill(apariencia, vertical=False):
+    """Tamaño de la cápsula y rectángulos (x, y, ancho, alto) del agarre y los botones.
+
+    Devuelve ``(ancho, alto, agarre, [botones])`` con el origen en la esquina.
+    """
+    b = int(round(apariencia["pill_boton"]))
+    largo = PILL_MARGEN * 2 + PILL_AGARRE + PILL_RAYA + NUM_BOTONES * b + (NUM_BOTONES - 1) * PILL_SEPARACION
+    grueso = b + PILL_MARGEN * 2
+    botones = []
+    pos = PILL_MARGEN + PILL_AGARRE + PILL_RAYA
+    for _ in range(NUM_BOTONES):
+        botones.append((pos, PILL_MARGEN, b, b))
+        pos += b + PILL_SEPARACION
+    agarre = (PILL_MARGEN, PILL_MARGEN, PILL_AGARRE, b)
+    if vertical:
+        botones = [(y, x, h, w) for (x, y, w, h) in botones]
+        agarre = (agarre[1], agarre[0], agarre[3], agarre[2])
+        return grueso, largo, agarre, botones
+    return largo, grueso, agarre, botones
+
+
+def que_hay_en_pill(x, y, apariencia, vertical=False):
+    """Índice de botón, ``"centro"`` (el agarre) o None, con el origen en la esquina."""
+    _, _, agarre, botones = geometria_pill(apariencia, vertical)
+    for i, (bx, by, bw, bh) in enumerate(botones):
+        if math.hypot(x - (bx + bw / 2.0), y - (by + bh / 2.0)) <= bw / 2.0 + 1:
+            return i
+    ax, ay, aw, ah = agarre
+    if ax <= x <= ax + aw and ay <= y <= ay + ah:
+        return "centro"
+    return None
+
+
+# --- Radiales del usuario ---------------------------------------------------
+# Cada radial propio es un archivo .radial en la carpeta del usuario. El nombre
+# del archivo sale del nombre del radial, sin acentos ni símbolos.
+
+def nombre_de_archivo(nombre):
+    texto = unicodedata.normalize("NFKD", nombre or "").encode("ascii", "ignore").decode("ascii")
+    texto = re.sub(r"[^A-Za-z0-9]+", "_", texto).strip("_").lower()
+    return (texto or "radial")[:60]
+
+
+def ruta_libre(carpeta, nombre):
+    """Ruta nueva en ``carpeta`` para un radial llamado ``nombre`` (sin pisar otro)."""
+    base = nombre_de_archivo(nombre)
+    ruta = os.path.join(carpeta, base + EXTENSION)
+    n = 2
+    while os.path.exists(ruta):
+        ruta = os.path.join(carpeta, "{}_{}{}".format(base, n, EXTENSION))
+        n += 1
+    return ruta
+
+
+def mios(carpeta):
+    """Radiales del usuario: lista de (identificador, ruta, nombre) ordenada por nombre."""
+    try:
+        archivos = [n for n in os.listdir(carpeta) if n.endswith(EXTENSION)]
+    except OSError:
+        return []
+    resultado = []
+    for archivo in archivos:
+        ruta = os.path.join(carpeta, archivo)
+        try:
+            nombre = leer(ruta)["nombre"]
+        except RadialNoValido:
+            continue
+        resultado.append((archivo[:-len(EXTENSION)], ruta, nombre))
+    return sorted(resultado, key=lambda r: (r[2].lower(), r[0]))
+
+
+def nombres_usados(carpeta):
+    return {nombre.lower() for _, _, nombre in mios(carpeta)}
+
+
+def nombre_libre(carpeta, nombre):
+    """``nombre`` o, si ya hay un radial propio con ese nombre, «nombre 2», «nombre 3»..."""
+    nombre = (nombre or "").strip() or "Radial"
+    usados = nombres_usados(carpeta)
+    if nombre.lower() not in usados:
+        return nombre
+    n = 2
+    while "{} {}".format(nombre, n).lower() in usados:
+        n += 1
+    return "{} {}".format(nombre, n)
+
+
+def guardar_nuevo(radial, carpeta, nombre=None):
+    """Guarda una copia de ``radial`` como radial propio. Devuelve (identificador, ruta, radial)."""
+    radial = normalizar(radial)
+    radial["nombre"] = nombre_libre(carpeta, nombre or radial["nombre"])
+    ruta = ruta_libre(carpeta, radial["nombre"])
+    escribir(radial, ruta)
+    return os.path.basename(ruta)[:-len(EXTENSION)], ruta, radial
+
+
+def importar(ruta_origen, carpeta):
+    """Copia un archivo .radial a los radiales propios. Lanza RadialNoValido si no lo es."""
+    return guardar_nuevo(leer(ruta_origen), carpeta)
+
+
+def renombrar(ruta, nuevo_nombre, carpeta):
+    """Cambia el nombre de un radial propio (y su archivo). Devuelve (identificador, ruta)."""
+    radial = leer(ruta)
+    nuevo_nombre = (nuevo_nombre or "").strip()
+    if not nuevo_nombre:
+        raise RadialNoValido("nombre vacío")
+    if nuevo_nombre.lower() != radial["nombre"].lower():
+        nuevo_nombre = nombre_libre(carpeta, nuevo_nombre)
+    radial["nombre"] = nuevo_nombre
+    nueva = ruta
+    if nombre_de_archivo(nuevo_nombre) != nombre_de_archivo(os.path.basename(ruta)[:-len(EXTENSION)]):
+        nueva = ruta_libre(carpeta, nuevo_nombre)
+    escribir(radial, nueva)
+    if os.path.normcase(os.path.abspath(nueva)) != os.path.normcase(os.path.abspath(ruta)):
+        os.remove(ruta)
+    return os.path.basename(nueva)[:-len(EXTENSION)], nueva

@@ -1,0 +1,55 @@
+{
+  "formato": 1,
+  "nombre": "Animación",
+  "botones": [
+    {
+      "texto": "Poner",
+      "detalle": "clave",
+      "icono": "llave",
+      "tipo": "comando",
+      "accion": "SetKey"
+    },
+    {
+      "texto": "Editor",
+      "detalle": "de gráficas",
+      "icono": "grafica",
+      "tipo": "comando",
+      "accion": "GraphEditor"
+    },
+    {
+      "texto": "Hoja",
+      "detalle": "de claves",
+      "icono": "fotogramas",
+      "tipo": "comando",
+      "accion": "DopeSheetEditor"
+    },
+    {
+      "texto": "Reproducir",
+      "detalle": "o parar",
+      "icono": "play",
+      "tipo": "comando",
+      "accion": "PlaybackToggle"
+    },
+    {
+      "texto": "Ir al",
+      "detalle": "inicio",
+      "icono": "inicio",
+      "tipo": "comando",
+      "accion": "GoToMinFrame"
+    },
+    {
+      "texto": "Hornear",
+      "detalle": "simulación",
+      "icono": "hornear",
+      "tipo": "comando",
+      "accion": "BakeSimulationOptions"
+    }
+  ],
+  "apariencia": {
+    "radio": 84,
+    "punto": 5,
+    "abierto": 21,
+    "opacidad": 1.0,
+    "pill_boton": 32
+  }
+}
