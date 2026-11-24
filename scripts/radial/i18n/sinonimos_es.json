@@ -1,0 +1,854 @@
+{
+ "CenterPivot": {
+  "es": "Centrar pivote",
+  "ayuda": "Pone el pivote en el centro del objeto seleccionado."
+ },
+ "BakeCustomPivot": {
+  "es": "Hornear pivote",
+  "ayuda": "Fija el pivote personalizado en la transformación del objeto."
+ },
+ "FreezeTransformations": {
+  "es": "Congelar transformaciones",
+  "ayuda": "Deja traslación y rotación a 0 y escala a 1 sin mover el objeto."
+ },
+ "ResetTransformations": {
+  "es": "Restablecer transformaciones",
+  "ayuda": "Devuelve el objeto a su posición, rotación y escala iniciales."
+ },
+ "DeleteHistory": {
+  "es": "Borrar historial",
+  "ayuda": "Borra el historial de construcción del objeto seleccionado."
+ },
+ "DeleteAllHistory": {
+  "es": "Borrar todo el historial",
+  "ayuda": "Borra el historial de construcción de toda la escena."
+ },
+ "DuplicateSpecialOptions": {
+  "es": "Duplicado especial",
+  "ayuda": "Duplica con opciones: copias, instancias y transformaciones."
+ },
+ "DuplicateSpecial": {
+  "es": "Duplicado especial",
+  "ayuda": "Repite el último duplicado especial."
+ },
+ "DuplicateWithTransform": {
+  "es": "Duplicar con transformación",
+  "ayuda": "Duplica y repite la última transformación."
+ },
+ "Duplicate": {
+  "es": "Duplicar",
+  "ayuda": "Crea una copia del objeto seleccionado."
+ },
+ "Group": {
+  "es": "Agrupar",
+  "ayuda": "Agrupa los objetos seleccionados bajo un nodo nuevo."
+ },
+ "Ungroup": {
+  "es": "Desagrupar",
+  "ayuda": "Quita el grupo y deja sus objetos sueltos."
+ },
+ "Parent": {
+  "es": "Emparentar",
+  "ayuda": "Hace hijo al primer objeto seleccionado del último."
+ },
+ "Unparent": {
+  "es": "Desemparentar",
+  "ayuda": "Saca el objeto de su padre."
+ },
+ "SelectHierarchy": {
+  "es": "Seleccionar jerarquía",
+  "ayuda": "Selecciona el objeto y todos sus hijos."
+ },
+ "InvertSelection": {
+  "es": "Invertir selección",
+  "ayuda": "Selecciona lo que no estaba seleccionado."
+ },
+ "SelectAll": {
+  "es": "Seleccionar todo",
+  "ayuda": "Selecciona todos los objetos de la escena."
+ },
+ "HideSelectedObjects": {
+  "es": "Ocultar selección",
+  "ayuda": "Oculta los objetos seleccionados."
+ },
+ "ShowAll": {
+  "es": "Mostrar todo",
+  "ayuda": "Vuelve a mostrar todos los objetos ocultos."
+ },
+ "ShowLastHidden": {
+  "es": "Mostrar lo último ocultado",
+  "ayuda": "Vuelve a mostrar lo último que ocultaste."
+ },
+ "MatchTransform": {
+  "es": "Igualar transformación",
+  "ayuda": "Copia posición, rotación y escala del último objeto seleccionado."
+ },
+ "MatchTranslation": {
+  "es": "Igualar posición",
+  "ayuda": "Copia la posición del último objeto seleccionado."
+ },
+ "MatchRotation": {
+  "es": "Igualar rotación",
+  "ayuda": "Copia la rotación del último objeto seleccionado."
+ },
+ "SnapToGrid": {
+  "es": "Ajustar a la rejilla",
+  "ayuda": "Coloca el objeto sobre el punto de rejilla más cercano."
+ },
+ "ToggleLocalRotationAxes": {
+  "es": "Ejes de rotación locales",
+  "ayuda": "Muestra u oculta los ejes de rotación locales."
+ },
+ "CreateLocator": {
+  "es": "Crear localizador",
+  "ayuda": "Crea un localizador en el origen."
+ },
+ "CreateEmptyGroup": {
+  "es": "Grupo vacío",
+  "ayuda": "Crea un grupo vacío."
+ },
+ "CreatePolygonCube": {
+  "es": "Cubo",
+  "ayuda": "Crea un cubo de polígonos."
+ },
+ "CreatePolygonSphere": {
+  "es": "Esfera",
+  "ayuda": "Crea una esfera de polígonos."
+ },
+ "CreatePolygonCylinder": {
+  "es": "Cilindro",
+  "ayuda": "Crea un cilindro de polígonos."
+ },
+ "CreatePolygonPlane": {
+  "es": "Plano",
+  "ayuda": "Crea un plano de polígonos."
+ },
+ "CreatePolygonTorus": {
+  "es": "Toroide",
+  "ayuda": "Crea un toroide (dónut) de polígonos."
+ },
+ "CreatePolygonCone": {
+  "es": "Cono",
+  "ayuda": "Crea un cono de polígonos."
+ },
+ "CreatePolygonPipe": {
+  "es": "Tubo",
+  "ayuda": "Crea un tubo de polígonos."
+ },
+ "CreatePolygonDisc": {
+  "es": "Disco",
+  "ayuda": "Crea un disco de polígonos."
+ },
+ "CreateNURBSCircle": {
+  "es": "Círculo NURBS",
+  "ayuda": "Crea un círculo de curva NURBS."
+ },
+ "CreateNURBSSquare": {
+  "es": "Cuadrado NURBS",
+  "ayuda": "Crea un cuadrado de curvas NURBS."
+ },
+ "CreateCameraOnly": {
+  "es": "Cámara",
+  "ayuda": "Crea una cámara."
+ },
+ "PolyExtrude": {
+  "es": "Extruir",
+  "ayuda": "Saca caras, aristas o vértices hacia fuera creando geometría nueva."
+ },
+ "PolyExtrudeOptions": {
+  "es": "Extruir (opciones)",
+  "ayuda": "Abre las opciones de Extruir."
+ },
+ "BevelPolygon": {
+  "es": "Biselar",
+  "ayuda": "Redondea aristas o vértices añadiendo caras."
+ },
+ "BevelPolygonOptions": {
+  "es": "Biselar (opciones)",
+  "ayuda": "Abre las opciones de Biselar."
+ },
+ "BridgeEdge": {
+  "es": "Puente",
+  "ayuda": "Une dos bordes con caras nuevas."
+ },
+ "PolyMerge": {
+  "es": "Unir vértices",
+  "ayuda": "Une los vértices que están muy cerca."
+ },
+ "PolyMergeOptions": {
+  "es": "Unir vértices (opciones)",
+  "ayuda": "Abre las opciones de Unir vértices."
+ },
+ "MergeVertexTool": {
+  "es": "Herramienta unir vértices",
+  "ayuda": "Arrastra un vértice sobre otro para unirlos."
+ },
+ "PolyMergeVertex": {
+  "es": "Unir vértices",
+  "ayuda": "Une los vértices seleccionados."
+ },
+ "MergeToCenter": {
+  "es": "Unir al centro",
+  "ayuda": "Une los componentes seleccionados en su centro."
+ },
+ "CollapseFace": {
+  "es": "Colapsar",
+  "ayuda": "Colapsa caras o aristas en un punto."
+ },
+ "PolygonCollapse": {
+  "es": "Colapsar",
+  "ayuda": "Colapsa caras o aristas en un punto."
+ },
+ "ExtractFace": {
+  "es": "Extraer caras",
+  "ayuda": "Separa las caras seleccionadas en una malla aparte."
+ },
+ "DuplicateFace": {
+  "es": "Duplicar caras",
+  "ayuda": "Copia las caras seleccionadas como malla aparte."
+ },
+ "DetachComponent": {
+  "es": "Separar componentes",
+  "ayuda": "Separa los vértices o aristas seleccionados."
+ },
+ "PolyAppendTool": {
+  "es": "Añadir polígono",
+  "ayuda": "Crea caras nuevas en el borde de una malla."
+ },
+ "FillHole": {
+  "es": "Rellenar agujero",
+  "ayuda": "Crea una cara que tapa el agujero seleccionado."
+ },
+ "PolygonBooleanUnion": {
+  "es": "Booleana: unión",
+  "ayuda": "Une dos mallas en una."
+ },
+ "PolygonBooleanDifference": {
+  "es": "Booleana: diferencia",
+  "ayuda": "Resta la segunda malla a la primera."
+ },
+ "PolygonBooleanIntersection": {
+  "es": "Booleana: intersección",
+  "ayuda": "Deja solo la parte común de dos mallas."
+ },
+ "CombinePolygons": {
+  "es": "Combinar",
+  "ayuda": "Junta varias mallas en una sola."
+ },
+ "SeparatePolygon": {
+  "es": "Separar",
+  "ayuda": "Separa una malla en sus partes sueltas."
+ },
+ "PolygonCombine": {
+  "es": "Combinar",
+  "ayuda": "Junta varias mallas en una sola."
+ },
+ "PolygonSeparate": {
+  "es": "Separar",
+  "ayuda": "Separa una malla en sus partes sueltas."
+ },
+ "SmoothPolygon": {
+  "es": "Suavizar",
+  "ayuda": "Subdivide la malla para que sea más suave."
+ },
+ "SmoothPolygonOptions": {
+  "es": "Suavizar (opciones)",
+  "ayuda": "Abre las opciones de Suavizar."
+ },
+ "ReducePolygon": {
+  "es": "Reducir",
+  "ayuda": "Quita polígonos manteniendo la forma."
+ },
+ "Triangulate": {
+  "es": "Triangular",
+  "ayuda": "Convierte las caras en triángulos."
+ },
+ "Quadrangulate": {
+  "es": "Cuadrangular",
+  "ayuda": "Convierte triángulos en cuadriláteros."
+ },
+ "MirrorPolygonGeometry": {
+  "es": "Simetría de malla",
+  "ayuda": "Crea la otra mitad de la malla en espejo."
+ },
+ "PolyMirror": {
+  "es": "Simetría de malla",
+  "ayuda": "Crea la otra mitad de la malla en espejo."
+ },
+ "CleanupPolygon": {
+  "es": "Limpiar malla",
+  "ayuda": "Busca y arregla geometría con problemas."
+ },
+ "InsertEdgeLoopTool": {
+  "es": "Insertar bucle de aristas",
+  "ayuda": "Corta la malla con un bucle de aristas nuevo."
+ },
+ "SplitEdgeRingTool": {
+  "es": "Insertar bucle de aristas",
+  "ayuda": "Corta la malla con un bucle de aristas nuevo."
+ },
+ "MultiCutTool": {
+  "es": "Corte múltiple",
+  "ayuda": "Corta caras dibujando líneas sobre la malla."
+ },
+ "dR_multiCutTool": {
+  "es": "Corte múltiple",
+  "ayuda": "Corta caras dibujando líneas sobre la malla."
+ },
+ "dR_connectTool": {
+  "es": "Conectar",
+  "ayuda": "Une componentes con aristas nuevas."
+ },
+ "dR_quadDrawTool": {
+  "es": "Dibujo de quads",
+  "ayuda": "Dibuja retopología con cuadriláteros sobre otra malla."
+ },
+ "dR_targetWeldTool": {
+  "es": "Soldar a destino",
+  "ayuda": "Arrastra un vértice o arista sobre otro para unirlos."
+ },
+ "OffsetEdgeLoopTool": {
+  "es": "Desplazar bucle de aristas",
+  "ayuda": "Crea dos bucles a ambos lados del seleccionado."
+ },
+ "PolySlideEdge": {
+  "es": "Deslizar aristas",
+  "ayuda": "Mueve aristas a lo largo de la malla."
+ },
+ "SlideEdgeTool": {
+  "es": "Deslizar aristas",
+  "ayuda": "Mueve aristas a lo largo de la malla."
+ },
+ "DeleteEdge": {
+  "es": "Borrar aristas",
+  "ayuda": "Borra aristas y sus vértices sobrantes."
+ },
+ "DeleteVertex": {
+  "es": "Borrar vértices",
+  "ayuda": "Borra los vértices seleccionados."
+ },
+ "PolyCircularize": {
+  "es": "Circularizar",
+  "ayuda": "Coloca los componentes en un círculo."
+ },
+ "ChamferVertex": {
+  "es": "Achaflanar vértice",
+  "ayuda": "Sustituye el vértice por una cara."
+ },
+ "PokePolygon": {
+  "es": "Pinchar cara",
+  "ayuda": "Añade un vértice en el centro de cada cara."
+ },
+ "WedgePolygon": {
+  "es": "Cuña",
+  "ayuda": "Extruye caras girando alrededor de una arista."
+ },
+ "SubdivideFace": {
+  "es": "Subdividir caras",
+  "ayuda": "Divide las caras seleccionadas."
+ },
+ "PolyAverageVertex": {
+  "es": "Promediar vértices",
+  "ayuda": "Suaviza la posición de los vértices."
+ },
+ "AverageVertex": {
+  "es": "Promediar vértices",
+  "ayuda": "Suaviza la posición de los vértices."
+ },
+ "ReversePolygonNormals": {
+  "es": "Invertir normales",
+  "ayuda": "Da la vuelta a las caras seleccionadas."
+ },
+ "ConformPolygonNormals": {
+  "es": "Unificar normales",
+  "ayuda": "Hace que todas las caras miren hacia el mismo lado."
+ },
+ "SoftPolyEdgeElements": {
+  "es": "Aristas suaves",
+  "ayuda": "Suaviza el sombreado de las aristas."
+ },
+ "HardPolyEdgeElements": {
+  "es": "Aristas duras",
+  "ayuda": "Marca aristas duras en el sombreado."
+ },
+ "PolygonSoftenHarden": {
+  "es": "Suavizar o endurecer aristas",
+  "ayuda": "Cambia el sombreado de las aristas."
+ },
+ "SetToFaceNormals": {
+  "es": "Normales a cara",
+  "ayuda": "Pone las normales perpendiculares a cada cara."
+ },
+ "ToggleFaceNormalDisplay": {
+  "es": "Ver normales",
+  "ayuda": "Muestra u oculta las normales de las caras."
+ },
+ "ConvertSelectionToFaces": {
+  "es": "Convertir a caras",
+  "ayuda": "Convierte la selección en caras."
+ },
+ "ConvertSelectionToEdges": {
+  "es": "Convertir a aristas",
+  "ayuda": "Convierte la selección en aristas."
+ },
+ "ConvertSelectionToVertices": {
+  "es": "Convertir a vértices",
+  "ayuda": "Convierte la selección en vértices."
+ },
+ "ConvertSelectionToUVs": {
+  "es": "Convertir a UV",
+  "ayuda": "Convierte la selección en UV."
+ },
+ "ConvertSelectionToShell": {
+  "es": "Convertir a isla",
+  "ayuda": "Selecciona toda la isla conectada."
+ },
+ "SelectEdgeLoopSp": {
+  "es": "Seleccionar bucle",
+  "ayuda": "Selecciona el bucle de aristas."
+ },
+ "SelectEdgeRingSp": {
+  "es": "Seleccionar anillo",
+  "ayuda": "Selecciona el anillo de aristas."
+ },
+ "GrowPolygonSelectionRegion": {
+  "es": "Ampliar selección",
+  "ayuda": "Amplía la selección a los componentes vecinos."
+ },
+ "ShrinkPolygonSelectionRegion": {
+  "es": "Reducir selección",
+  "ayuda": "Reduce la selección."
+ },
+ "SelectToggleMode": {
+  "es": "Objeto o componente",
+  "ayuda": "Cambia entre seleccionar objetos y componentes."
+ },
+ "SculptGeometryTool": {
+  "es": "Esculpir",
+  "ayuda": "Herramienta para esculpir la malla."
+ },
+ "SetMeshSculptTool": {
+  "es": "Esculpir",
+  "ayuda": "Herramienta para esculpir la malla."
+ },
+ "SetMeshSmoothTool": {
+  "es": "Suavizar (esculpido)",
+  "ayuda": "Pincel que suaviza la malla."
+ },
+ "SetMeshGrabTool": {
+  "es": "Agarrar (esculpido)",
+  "ayuda": "Pincel que arrastra la malla."
+ },
+ "SoftModTool": {
+  "es": "Modificador suave",
+  "ayuda": "Deforma una zona con caída suave."
+ },
+ "LatticeDeformer": {
+  "es": "Lattice",
+  "ayuda": "Crea una caja de deformación alrededor del objeto."
+ },
+ "CreateLattice": {
+  "es": "Lattice",
+  "ayuda": "Crea una caja de deformación alrededor del objeto."
+ },
+ "Bend": {
+  "es": "Doblar",
+  "ayuda": "Añade un deformador para doblar."
+ },
+ "Twist": {
+  "es": "Torcer",
+  "ayuda": "Añade un deformador para torcer."
+ },
+ "TextureViewWindow": {
+  "es": "Editor de UV",
+  "ayuda": "Abre el editor de UV."
+ },
+ "UVEditor": {
+  "es": "Editor de UV",
+  "ayuda": "Abre el editor de UV."
+ },
+ "UVAutomaticProjection": {
+  "es": "Proyección automática",
+  "ayuda": "Crea UV automáticas proyectando desde varios lados."
+ },
+ "UVPlanarProjection": {
+  "es": "Proyección plana",
+  "ayuda": "Crea UV proyectando desde un plano."
+ },
+ "UVCylindricProjection": {
+  "es": "Proyección cilíndrica",
+  "ayuda": "Crea UV proyectando desde un cilindro."
+ },
+ "UVSphericalProjection": {
+  "es": "Proyección esférica",
+  "ayuda": "Crea UV proyectando desde una esfera."
+ },
+ "UVCameraBasedProjection": {
+  "es": "Proyección desde la cámara",
+  "ayuda": "Crea UV desde el punto de vista de la cámara."
+ },
+ "UVUnfold": {
+  "es": "Desplegar UV",
+  "ayuda": "Despliega las UV para que no se deformen."
+ },
+ "UnfoldUV": {
+  "es": "Desplegar UV",
+  "ayuda": "Despliega las UV para que no se deformen."
+ },
+ "UVLayout": {
+  "es": "Organizar UV",
+  "ayuda": "Coloca las islas UV dentro del cuadrado 0-1."
+ },
+ "LayoutUV": {
+  "es": "Organizar UV",
+  "ayuda": "Coloca las islas UV dentro del cuadrado 0-1."
+ },
+ "CutUVs": {
+  "es": "Cortar UV",
+  "ayuda": "Corta las UV por las aristas seleccionadas."
+ },
+ "CutPolygon": {
+  "es": "Cortar UV",
+  "ayuda": "Corta las UV por las aristas seleccionadas."
+ },
+ "SewUVs": {
+  "es": "Coser UV",
+  "ayuda": "Une las UV por las aristas seleccionadas."
+ },
+ "polySewUV": {
+  "es": "Coser UV",
+  "ayuda": "Une las UV por las aristas seleccionadas."
+ },
+ "UVStraighten": {
+  "es": "Enderezar UV",
+  "ayuda": "Pone rectas las UV seleccionadas."
+ },
+ "UVOrientShells": {
+  "es": "Orientar islas",
+  "ayuda": "Gira las islas UV para que queden rectas."
+ },
+ "UVSnapTogether": {
+  "es": "Juntar UV",
+  "ayuda": "Une dos UV moviendo una sobre la otra."
+ },
+ "ToggleUVTextureImage": {
+  "es": "Ver textura en el editor UV",
+  "ayuda": "Muestra u oculta la imagen de la textura."
+ },
+ "UVCheckerMap": {
+  "es": "Patrón de comprobación",
+  "ayuda": "Muestra un patrón de cuadros para ver la deformación."
+ },
+ "HypershadeWindow": {
+  "es": "Hypershade",
+  "ayuda": "Abre el editor de materiales."
+ },
+ "NodeEditorWindow": {
+  "es": "Editor de nodos",
+  "ayuda": "Abre el editor de nodos."
+ },
+ "OutlinerWindow": {
+  "es": "Outliner",
+  "ayuda": "Abre la lista de objetos de la escena."
+ },
+ "AttributeEditor": {
+  "es": "Editor de atributos",
+  "ayuda": "Muestra los atributos del objeto seleccionado."
+ },
+ "ToggleAttributeEditor": {
+  "es": "Editor de atributos",
+  "ayuda": "Muestra u oculta el editor de atributos."
+ },
+ "ToggleChannelsLayers": {
+  "es": "Caja de canales",
+  "ayuda": "Muestra u oculta la caja de canales."
+ },
+ "ScriptEditor": {
+  "es": "Editor de scripts",
+  "ayuda": "Abre el editor de scripts."
+ },
+ "HotkeyPreferencesWindow": {
+  "es": "Editor de atajos",
+  "ayuda": "Abre el editor de atajos de teclado."
+ },
+ "PreferencesWindow": {
+  "es": "Preferencias",
+  "ayuda": "Abre las preferencias de Maya."
+ },
+ "PluginManager": {
+  "es": "Gestor de plugins",
+  "ayuda": "Abre el gestor de plugins."
+ },
+ "RenderViewWindow": {
+  "es": "Ventana de render",
+  "ayuda": "Abre la ventana de render."
+ },
+ "RenderGlobalsWindow": {
+  "es": "Ajustes de render",
+  "ayuda": "Abre los ajustes de render."
+ },
+ "RenderIntoNewWindow": {
+  "es": "Renderizar",
+  "ayuda": "Renderiza el fotograma actual en una ventana nueva."
+ },
+ "IPRRenderIntoNewWindow": {
+  "es": "Render interactivo",
+  "ayuda": "Renderiza de forma interactiva mientras cambias la escena."
+ },
+ "CreateDirectionalLight": {
+  "es": "Luz direccional",
+  "ayuda": "Crea una luz direccional."
+ },
+ "CreatePointLight": {
+  "es": "Luz puntual",
+  "ayuda": "Crea una luz puntual."
+ },
+ "CreateSpotLight": {
+  "es": "Foco",
+  "ayuda": "Crea una luz de foco."
+ },
+ "CreateAreaLight": {
+  "es": "Luz de área",
+  "ayuda": "Crea una luz de área."
+ },
+ "AssignNewMaterial": {
+  "es": "Asignar material nuevo",
+  "ayuda": "Crea un material y lo asigna a la selección."
+ },
+ "ProjectWindow": {
+  "es": "Proyecto",
+  "ayuda": "Crea o configura un proyecto."
+ },
+ "SetProject": {
+  "es": "Establecer proyecto",
+  "ayuda": "Elige la carpeta del proyecto."
+ },
+ "SetKey": {
+  "es": "Poner clave",
+  "ayuda": "Pone una clave en los atributos del objeto seleccionado."
+ },
+ "SetKeyTranslate": {
+  "es": "Clave de posición",
+  "ayuda": "Pone una clave solo en la traslación."
+ },
+ "SetKeyRotate": {
+  "es": "Clave de rotación",
+  "ayuda": "Pone una clave solo en la rotación."
+ },
+ "SetKeyScale": {
+  "es": "Clave de escala",
+  "ayuda": "Pone una clave solo en la escala."
+ },
+ "GraphEditor": {
+  "es": "Editor de gráficos",
+  "ayuda": "Abre el editor de curvas de animación."
+ },
+ "DopeSheetEditor": {
+  "es": "Hoja de tiempos",
+  "ayuda": "Abre la hoja de tiempos (Dope Sheet)."
+ },
+ "TimeEditorWindow": {
+  "es": "Editor de tiempo",
+  "ayuda": "Abre el editor de tiempo."
+ },
+ "PlaybackToggle": {
+  "es": "Reproducir o parar",
+  "ayuda": "Reproduce o detiene la animación."
+ },
+ "PlaybackForward": {
+  "es": "Reproducir",
+  "ayuda": "Reproduce la animación."
+ },
+ "PlaybackStop": {
+  "es": "Parar",
+  "ayuda": "Detiene la animación."
+ },
+ "GoToMinFrame": {
+  "es": "Ir al inicio",
+  "ayuda": "Va al primer fotograma."
+ },
+ "GoToMaxFrame": {
+  "es": "Ir al final",
+  "ayuda": "Va al último fotograma."
+ },
+ "NextKey": {
+  "es": "Clave siguiente",
+  "ayuda": "Va a la siguiente clave."
+ },
+ "PreviousKey": {
+  "es": "Clave anterior",
+  "ayuda": "Va a la clave anterior."
+ },
+ "NextFrame": {
+  "es": "Fotograma siguiente",
+  "ayuda": "Avanza un fotograma."
+ },
+ "PreviousFrame": {
+  "es": "Fotograma anterior",
+  "ayuda": "Retrocede un fotograma."
+ },
+ "BakeSimulationOptions": {
+  "es": "Hornear simulación",
+  "ayuda": "Convierte la animación en claves en cada fotograma."
+ },
+ "PlayblastOptions": {
+  "es": "Playblast",
+  "ayuda": "Graba una vista previa de la animación."
+ },
+ "Playblast": {
+  "es": "Playblast",
+  "ayuda": "Graba una vista previa de la animación."
+ },
+ "GhostingOptions": {
+  "es": "Papel cebolla",
+  "ayuda": "Muestra fotogramas anteriores y siguientes."
+ },
+ "MotionTrail": {
+  "es": "Trayectoria",
+  "ayuda": "Muestra el recorrido del objeto animado."
+ },
+ "CreateMotionTrail": {
+  "es": "Trayectoria",
+  "ayuda": "Muestra el recorrido del objeto animado."
+ },
+ "AttachToPath": {
+  "es": "Animar por trayectoria",
+  "ayuda": "Hace que el objeto recorra una curva."
+ },
+ "ParentConstraint": {
+  "es": "Restricción de padre",
+  "ayuda": "El objeto sigue a otro como si fuera su hijo."
+ },
+ "PointConstraint": {
+  "es": "Restricción de punto",
+  "ayuda": "El objeto sigue la posición de otro."
+ },
+ "OrientConstraint": {
+  "es": "Restricción de orientación",
+  "ayuda": "El objeto sigue la rotación de otro."
+ },
+ "AimConstraint": {
+  "es": "Restricción de apuntar",
+  "ayuda": "El objeto apunta siempre hacia otro."
+ },
+ "JointTool": {
+  "es": "Crear huesos",
+  "ayuda": "Crea una cadena de huesos (joints)."
+ },
+ "SmoothBindSkin": {
+  "es": "Vincular piel",
+  "ayuda": "Une la malla al esqueleto."
+ },
+ "ArtPaintSkinWeightsTool": {
+  "es": "Pintar pesos",
+  "ayuda": "Pinta cuánto mueve cada hueso la malla."
+ },
+ "GoToBindPose": {
+  "es": "Pose de vinculación",
+  "ayuda": "Devuelve el esqueleto a la pose inicial."
+ },
+ "FrameSelected": {
+  "es": "Encuadrar selección",
+  "ayuda": "Centra la vista en lo seleccionado."
+ },
+ "FrameAll": {
+  "es": "Encuadrar todo",
+  "ayuda": "Centra la vista en toda la escena."
+ },
+ "ToggleIsolateSelect": {
+  "es": "Aislar selección",
+  "ayuda": "Muestra solo lo seleccionado en el visor."
+ },
+ "ToggleWireframeOnShaded": {
+  "es": "Malla sobre sombreado",
+  "ayuda": "Muestra la malla encima del sombreado."
+ },
+ "ToggleXRay": {
+  "es": "Rayos X",
+  "ayuda": "Hace los objetos semitransparentes en el visor."
+ },
+ "ToggleGrid": {
+  "es": "Rejilla",
+  "ayuda": "Muestra u oculta la rejilla."
+ },
+ "DisplayWireframe": {
+  "es": "Ver malla",
+  "ayuda": "Muestra los objetos como malla de alambre."
+ },
+ "DisplayShaded": {
+  "es": "Ver sombreado",
+  "ayuda": "Muestra los objetos sombreados."
+ },
+ "DisplayShadedAndTextured": {
+  "es": "Ver texturas",
+  "ayuda": "Muestra los objetos con sus texturas."
+ },
+ "DisplayLight": {
+  "es": "Ver luces",
+  "ayuda": "Ilumina el visor con las luces de la escena."
+ },
+ "SmoothProxy": {
+  "es": "Vista suavizada",
+  "ayuda": "Muestra la malla suavizada."
+ },
+ "TogglePolyCount": {
+  "es": "Contar polígonos",
+  "ayuda": "Muestra cuántos polígonos hay en la escena."
+ },
+ "ToggleHeadsUpDisplay": {
+  "es": "Información en pantalla",
+  "ayuda": "Muestra u oculta la información del visor."
+ },
+ "SnapToGridPress": {
+  "es": "Imán a la rejilla",
+  "ayuda": "Ajusta a la rejilla mientras mantienes la tecla."
+ },
+ "SnapToPointPress": {
+  "es": "Imán a vértices",
+  "ayuda": "Ajusta a vértices mientras mantienes la tecla."
+ },
+ "ToggleSymmetryDisplay": {
+  "es": "Simetría",
+  "ayuda": "Activa o desactiva la simetría al modelar."
+ },
+ "SaveScene": {
+  "es": "Guardar escena",
+  "ayuda": "Guarda la escena."
+ },
+ "SaveSceneAs": {
+  "es": "Guardar como",
+  "ayuda": "Guarda la escena con otro nombre."
+ },
+ "Import": {
+  "es": "Importar",
+  "ayuda": "Importa un archivo a la escena."
+ },
+ "ExportSelection": {
+  "es": "Exportar selección",
+  "ayuda": "Exporta lo seleccionado a un archivo."
+ },
+ "OpenScene": {
+  "es": "Abrir escena",
+  "ayuda": "Abre una escena."
+ },
+ "NewScene": {
+  "es": "Escena nueva",
+  "ayuda": "Crea una escena vacía."
+ },
+ "Undo": {
+  "es": "Deshacer",
+  "ayuda": "Deshace la última acción."
+ },
+ "Redo": {
+  "es": "Rehacer",
+  "ayuda": "Rehace la última acción deshecha."
+ },
+ "RepeatLast": {
+  "es": "Repetir",
+  "ayuda": "Repite la última orden."
+ },
+ "Delete": {
+  "es": "Borrar",
+  "ayuda": "Borra lo seleccionado."
+ }
+}

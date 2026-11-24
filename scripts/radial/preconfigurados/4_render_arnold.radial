@@ -1,0 +1,55 @@
+{
+  "formato": 1,
+  "nombre": "Render con Arnold",
+  "botones": [
+    {
+      "texto": "Arnold",
+      "detalle": "RenderView",
+      "icono": "ojo",
+      "tipo": "python",
+      "accion": "import maya.cmds as cmds\nif not cmds.pluginInfo('mtoa', query=True, loaded=True):\n    cmds.loadPlugin('mtoa')\nimport mtoa.ui.arnoldmenu as arnoldmenu\narnoldmenu.arnoldMtoARenderView()"
+    },
+    {
+      "texto": "Ajustes",
+      "detalle": "de render",
+      "icono": "engranaje",
+      "tipo": "comando",
+      "accion": "RenderGlobalsWindow"
+    },
+    {
+      "texto": "Cúpula",
+      "detalle": "de cielo",
+      "icono": "cielo",
+      "tipo": "python",
+      "accion": "import maya.cmds as cmds\nif not cmds.pluginInfo('mtoa', query=True, loaded=True):\n    cmds.loadPlugin('mtoa')\nimport mtoa.utils as mutils\nmutils.createLocator('aiSkyDomeLight', asLight=True)"
+    },
+    {
+      "texto": "Luz",
+      "detalle": "de área",
+      "icono": "luz",
+      "tipo": "python",
+      "accion": "import maya.cmds as cmds\nif not cmds.pluginInfo('mtoa', query=True, loaded=True):\n    cmds.loadPlugin('mtoa')\nimport mtoa.utils as mutils\nmutils.createLocator('aiAreaLight', asLight=True)"
+    },
+    {
+      "texto": "Hypershade",
+      "detalle": "",
+      "icono": "hypershade",
+      "tipo": "comando",
+      "accion": "HypershadeWindow"
+    },
+    {
+      "texto": "Render",
+      "detalle": "View",
+      "icono": "render",
+      "tipo": "comando",
+      "accion": "RenderViewWindow"
+    }
+  ],
+  "apariencia": {
+    "radio": 84,
+    "punto": 5,
+    "abierto": 21,
+    "opacidad": 1.0,
+    "pill_boton": 32
+  }
+}
