@@ -543,6 +543,33 @@ class PruebaInterfaz(unittest.TestCase):
             self.assertIsNone(self.im.abrir_reto())
         self.assertTrue(self.cmds.confirmDialog.called)
 
+    def test_aspecto(self):
+        from radial import dibujo, i18n, tema
+        self.addCleanup(tema.aplicar, "oscuro", "")
+        self.addCleanup(i18n.usar_idioma, "es")
+        self.im.mostrar()
+        menu_antes = self.im._menu_flotante(crear=False)
+        ventana = self.im.abrir_ajustes()
+        ventana.tema_claro.setChecked(True)
+        self.assertEqual(self.im.ajustes().tema, "claro")
+        self.assertGreater(dibujo.COLOR_FONDO.lightness(), 200)
+        menu = self.im._menu_flotante(crear=False)
+        self.assertIsNot(menu, menu_antes)  # se rehace con los colores nuevos
+        self.assertTrue(self.im.visible())
+        ventana.muestras["#ff6b9a"].click()
+        self.assertEqual(self.im.ajustes().acento, "#ff6b9a")
+        self.assertTrue(ventana.muestras["#ff6b9a"].isChecked())
+        self.assertEqual(dibujo.COLOR_ABIERTO.name(), "#ff6b9a")
+        # Idioma: el menú de Maya se rehace en inglés y la ventana vuelve a abrirse
+        ventana.idioma.setCurrentIndex(ventana.idioma.findData("en"))
+        self.assertEqual(self.im.ajustes().idioma, "en")
+        self.assertEqual(i18n.t("menu_ajustes"), "Settings...")
+        self.cmds.menuItem.assert_any_call(label="Settings...", command=mock.ANY)
+        self.app.processEvents()
+        nueva = self.im._ventana("ventana_ajustes")
+        self.assertIsNotNone(nueva)
+        self.assertEqual(nueva.windowTitle(), "Radial · Settings")
+
     def test_volver_a_centrar(self):
         self.im._al_mover(QtCore.QPoint(10, 10))
         self.im.volver_a_centrar()

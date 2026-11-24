@@ -14,7 +14,7 @@ import math
 
 from radial import radiales as rd
 from radial.dibujo import (COLOR_ABIERTO, COLOR_AGARRE, COLOR_AGARRE_SOBRE, COLOR_BORDE, COLOR_CENTRO,
-                           COLOR_DETALLE, COLOR_LINEA, COLOR_PUNTO, COLOR_TEXTO, dibujar_icono_boton,
+                           COLOR_DETALLE, COLOR_INICIAL_ABIERTO, COLOR_LINEA, COLOR_PUNTO, COLOR_TEXTO, dibujar_icono_boton,
                            dibujar_texto, mezclar)
 from radial.menu_comun import (COLOR_ENCENDIDO, DISTANCIA_GESTO, MenuComun, dibujar_encendido, dibujar_flecha_volver,
                                  dibujar_insignia_opciones, dibujar_marca_carpeta)
@@ -269,7 +269,7 @@ class MenuRadial(MenuComun, QtWidgets.QWidget):
                 if encendido:
                     dibujar_encendido(pintor, abajo)
                 elif boton["tipo"] == "carpeta":
-                    dibujar_marca_carpeta(pintor, abajo, QtGui.QColor(40, 40, 40))
+                    dibujar_marca_carpeta(pintor, abajo, COLOR_INICIAL_ABIERTO)
                 if self._muestra_opciones(i):
                     dibujar_insignia_opciones(pintor, QtCore.QPointF(x + r * 0.72, y + r * 0.72))
 

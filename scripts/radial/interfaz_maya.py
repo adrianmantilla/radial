@@ -210,6 +210,64 @@ def exportar_bloqueado():
     print(t("exportado_bloqueado", ruta=ruta))
 
 
+# --- Aspecto: tema, acento e idioma -------------------------------------------------
+
+def _rehacer_flotantes():
+    """Vuelve a crear el menú, el buscador, la tarjeta y la pill extra (tras cambiar tema o idioma)."""
+    from radial import pill_extra
+    estaba_visible = visible()
+    _destruir_menu_flotante()
+    _destruir_buscador()
+    tarjeta = _estado.get("tarjeta")
+    if sigue_vivo(tarjeta):
+        tarjeta.hide()
+        destruir(tarjeta)
+    _estado["tarjeta"] = None
+    extra_activa = pill_extra.visible()
+    pill_extra.detener()
+    if extra_activa:
+        pill_extra.iniciar()
+    if estaba_visible:
+        mostrar()
+
+
+def cambiar_aspecto(tema_nuevo=None, acento=None):
+    """Tema («oscuro» o «claro») y color de acento («#rrggbb» o "" para el del tema)."""
+    from radial import tema
+    if tema_nuevo is not None:
+        ajustes().tema = tema_nuevo
+    if acento is not None:
+        ajustes().acento = acento
+    ajustes().guardar()
+    if tema.aplicar(ajustes().tema, ajustes().acento):
+        _rehacer_flotantes()
+
+
+def cambiar_idioma(idioma):
+    """Idioma de la interfaz («es», «en»...). Rehace el menú de Maya y las ventanas."""
+    from radial import i18n
+    ajustes().idioma = idioma
+    ajustes().guardar()
+    if i18n.idioma() == (idioma or i18n.IDIOMA_BASE):
+        return
+    i18n.usar_idioma(idioma)
+    crear_menu()
+    _rehacer_flotantes()
+    ventana = _ventana("ventana_ajustes")
+    if ventana:
+        indice = ventana.pestanas.currentIndex()
+
+        def reabrir():
+            if _ventana("ventana_ajustes"):
+                _estado["ventana_ajustes"].close()
+                destruir(_estado["ventana_ajustes"])
+            _estado["ventana_ajustes"] = None
+            nueva = abrir_ajustes()
+            nueva.pestanas.setCurrentIndex(indice)
+
+        QtCore.QTimer.singleShot(0, reabrir)  # no se destruye una ventana desde su propia señal
+
+
 # --- Paquete de clase -----------------------------------------------------------
 
 def cargar_fijadas():
@@ -612,12 +670,28 @@ def abrir_ajustes():
                              opciones=_opciones(), al_opcion=cambiar_opcion, al_reglas=abrir_reglas,
                              extra=_datos_extra(), al_extra=cambiar_extra,
                              cantidad=len(radial_activo()["botones"]), al_cantidad=cambiar_cantidad,
-                             atajo=ajustes().atajo, al_atajo=cambiar_atajo)
+                             atajo=ajustes().atajo, al_atajo=cambiar_atajo,
+                             aspecto=_datos_aspecto(), al_aspecto=_al_aspecto)
     ventana.fijar_bloqueadas(dict(ajustes().fijadas))
     _estado["ventana_ajustes"] = ventana
     if not visible():
         mostrar()
     return _traer(ventana)
+
+
+def _datos_aspecto():
+    from radial import i18n
+    return {"tema": ajustes().tema, "acento": ajustes().acento, "idioma": i18n.idioma(),
+            "idiomas": i18n.idiomas()}
+
+
+def _al_aspecto(clave, valor):
+    if clave == "tema":
+        cambiar_aspecto(tema_nuevo=valor)
+    elif clave == "acento":
+        cambiar_aspecto(acento=valor)
+    elif clave == "idioma":
+        cambiar_idioma(valor)
 
 
 def cambiar_cantidad(cantidad):
@@ -1243,6 +1317,10 @@ def iniciar():
         cargar_fijadas()
     except Exception as error:  # una carpeta de clase rota no impide que el plugin cargue
         cmds.warning(str(error))
+    from radial import i18n, tema
+    if ajustes().idioma:
+        i18n.usar_idioma(ajustes().idioma)
+    tema.aplicar(ajustes().tema, ajustes().acento)
     from radial import acciones
     if _al_usar not in acciones.oyentes:
         acciones.oyentes.append(_al_usar)

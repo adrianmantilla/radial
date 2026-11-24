@@ -129,7 +129,7 @@ class VentanaAjustes(QtWidgets.QDialog):
     def __init__(self, apariencia, forma, vertical, ventana_ms, al_apariencia=None, al_forma=None,
                  al_velocidad=None, padre=None, buscador=True, al_buscador=None, opciones=None,
                  al_opcion=None, al_reglas=None, extra=None, al_extra=None, cantidad=None, al_cantidad=None,
-                 atajo="", al_atajo=None):
+                 atajo="", al_atajo=None, aspecto=None, al_aspecto=None):
         super(VentanaAjustes, self).__init__(padre)
         self.setWindowTitle(t("ajustes_titulo"))
         self.setObjectName("RadialAjustes")
@@ -143,6 +143,7 @@ class VentanaAjustes(QtWidgets.QDialog):
         self._al_extra = al_extra
         self._al_cantidad = al_cantidad
         self._al_atajo = al_atajo
+        self._al_aspecto = al_aspecto
         opciones = dict(opciones or {})
         self.apariencia = rd.normalizar_apariencia(apariencia)
 
@@ -284,6 +285,7 @@ class VentanaAjustes(QtWidgets.QDialog):
 
         self.pestanas.addTab(self._grupo_extra(), t("ajustes_extra"))
         self.fijar_extra(extra or {})
+        self.pestanas.addTab(self._grupo_aspecto(aspecto or {}), t("ajustes_aspecto"))
         self._atajo_bueno = atajo or ""
         capa = exterior
 
@@ -396,6 +398,94 @@ class VentanaAjustes(QtWidgets.QDialog):
         self._mostrar_filas()
         if self._al_forma:
             self._al_forma(self.forma(), self.vertical.isChecked())
+
+    # --- Aspecto ---------------------------------------------------------------
+
+    def _grupo_aspecto(self, aspecto):
+        from radial import tema
+        grupo = QtWidgets.QWidget()
+        capa = QtWidgets.QVBoxLayout(grupo)
+        formulario = QtWidgets.QFormLayout()
+        capa.addLayout(formulario)
+
+        self.tema_oscuro = QtWidgets.QRadioButton(t("tema_oscuro"))
+        self.tema_claro = QtWidgets.QRadioButton(t("tema_claro"))
+        (self.tema_claro if aspecto.get("tema") == "claro" else self.tema_oscuro).setChecked(True)
+        grupo_tema = QtWidgets.QButtonGroup(grupo)
+        fila = QtWidgets.QHBoxLayout()
+        for boton in (self.tema_oscuro, self.tema_claro):
+            grupo_tema.addButton(boton)
+            fila.addWidget(boton)
+        fila.addStretch(1)
+        formulario.addRow(t("ajustes_tema"), fila)
+        self.tema_claro.toggled.connect(
+            lambda claro: self._aspecto("tema", "claro" if claro else "oscuro"))
+
+        self.acento = tema.normalizar_acento(aspecto.get("acento", ""))
+        self.muestras = {}
+        fila = QtWidgets.QHBoxLayout()
+        fila.setSpacing(6)
+        for color, nombre in tema.ACENTOS:
+            muestra = QtWidgets.QToolButton()
+            muestra.setCheckable(True)
+            muestra.setAutoExclusive(True)
+            muestra.setFixedSize(26, 26)
+            muestra.setToolTip(t(nombre))
+            relleno = color or "qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0.49 #f4f4f4, stop:0.51 #1e1f23)"
+            muestra.setStyleSheet("QToolButton {{ background: {}; border: 1px solid rgba(128,128,128,120); "
+                                  "border-radius: 13px; }} QToolButton:checked {{ border: 3px solid palette(highlight); }}"
+                                  .format(relleno))
+            muestra.clicked.connect(lambda *_, c=color: self._elegir_acento(c))
+            self.muestras[color] = muestra
+            fila.addWidget(muestra)
+        self.otro_acento = QtWidgets.QPushButton(t("acento_otro"))
+        self.otro_acento.clicked.connect(self._otro_acento)
+        fila.addWidget(self.otro_acento)
+        fila.addStretch(1)
+        formulario.addRow(t("ajustes_acento"), fila)
+        self._marcar_acento()
+
+        self.idioma = QtWidgets.QComboBox()
+        for codigo, nombre in aspecto.get("idiomas", []):
+            self.idioma.addItem(nombre, codigo)
+        indice = self.idioma.findData(aspecto.get("idioma", "es"))
+        self.idioma.setCurrentIndex(max(0, indice))
+        self.idioma.currentIndexChanged.connect(lambda *_: self._aspecto("idioma", self.idioma.currentData()))
+        fila = QtWidgets.QHBoxLayout()
+        fila.addWidget(self.idioma)
+        fila.addStretch(1)
+        formulario.addRow(t("ajustes_idioma"), fila)
+        nota = QtWidgets.QLabel(t("ajustes_aspecto_ayuda"))
+        nota.setWordWrap(True)
+        nota.setEnabled(False)
+        capa.addWidget(nota)
+        capa.addStretch(1)
+        return grupo
+
+    def _marcar_acento(self):
+        muestra = self.muestras.get(self.acento)
+        for boton in self.muestras.values():
+            boton.setAutoExclusive(False)
+            boton.setChecked(boton is muestra)
+            boton.setAutoExclusive(True)
+        self.otro_acento.setText(t("acento_otro") if muestra is not None or not self.acento
+                                 else "{} {}".format(t("acento_otro"), self.acento))
+
+    def _elegir_acento(self, color):
+        from radial import tema
+        self.acento = tema.normalizar_acento(color)
+        self._marcar_acento()
+        self._aspecto("acento", self.acento)
+
+    def _otro_acento(self):
+        inicial = QtGui.QColor(self.acento or "#4c8dff")
+        color = QtWidgets.QColorDialog.getColor(inicial, self, t("ajustes_acento"))
+        if color.isValid():
+            self._elegir_acento(color.name())
+
+    def _aspecto(self, clave, valor):
+        if self._al_aspecto:
+            self._al_aspecto(clave, valor)
 
     # --- Pill extra -------------------------------------------------------------
 

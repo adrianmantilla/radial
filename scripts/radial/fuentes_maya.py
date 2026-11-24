@@ -231,6 +231,7 @@ def _texto_atajo(tecla):
         partes.append("Cmd")
     letra = tecla[0]
     if len(letra) == 1 and letra.isupper():
-        partes.append("Mayús")
+        from radial.i18n import t
+        partes.append(t("tecla_mayus"))
     partes.append(letra.upper() if len(letra) == 1 else letra)
     return "+".join(partes)

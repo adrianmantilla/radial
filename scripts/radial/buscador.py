@@ -325,8 +325,9 @@ class Buscador(QtWidgets.QWidget):
         self.campo.setFrame(False)
         self.campo.setFocusPolicy(Qt.ClickFocus)
         self.campo.setAttribute(Qt.WA_MacShowFocusRect, False)
-        self.campo.setStyleSheet("QLineEdit { background: transparent; border: none; color: #f2f2f2; "
-                                 "font-size: 13px; selection-background-color: #5a6578; }")
+        self.campo.setStyleSheet("QLineEdit {{ background: transparent; border: none; color: {}; "
+                                 "font-size: 13px; selection-background-color: #5a6578; }}".format(
+                                     COLOR_TEXTO.name()))
         paleta = self.campo.palette()
         paleta.setColor(QtGui.QPalette.PlaceholderText, COLOR_PISTA)
         self.campo.setPalette(paleta)

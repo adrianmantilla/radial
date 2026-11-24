@@ -17,6 +17,9 @@ COLOR_AGARRE_SOBRE = QtGui.QColor(255, 255, 255, 200)
 COLOR_TEXTO = QtGui.QColor(242, 242, 242)
 COLOR_DETALLE = QtGui.QColor(196, 196, 196)
 COLOR_SOMBRA = QtGui.QColor(0, 0, 0, 150)
+COLOR_INICIAL = QtGui.QColor(236, 236, 236)  # inicial o marca sobre el botón en reposo
+COLOR_INICIAL_ABIERTO = QtGui.QColor(20, 20, 20)  # ... y sobre el botón abierto
+COLOR_TARJETA = QtGui.QColor(22, 23, 26, 236)  # fondo de la tarjeta de ayuda
 COLOR_ICONO_CLARO = "#ececec"
 COLOR_ICONO_OSCURO = "#141414"
 
@@ -30,8 +33,12 @@ def mezclar(a, b, t):
     )
 
 
-def pixmap_icono(icono, tamano, escala=1.0, color=COLOR_ICONO_OSCURO):
-    """QPixmap de un icono de línea, un icono de Maya o un archivo. None si no hay icono."""
+def pixmap_icono(icono, tamano, escala=1.0, color=None):
+    """QPixmap de un icono de línea, un icono de Maya o un archivo. None si no hay icono.
+
+    Sin ``color``, el de los iconos sobre un botón abierto (cambia con el tema).
+    """
+    color = color or COLOR_ICONO_OSCURO
     lado = max(1, int(round(tamano * escala)))
     mapa = None
     datos = iconos.svg(icono, color)
@@ -51,7 +58,7 @@ def pixmap_icono(icono, tamano, escala=1.0, color=COLOR_ICONO_OSCURO):
     return mapa
 
 
-def qicono(icono, tamano=20, color=COLOR_ICONO_CLARO):
+def qicono(icono, tamano=20, color="#ececec"):
     """QIcon para listas y botones de las ventanas (iconos de línea en claro)."""
     mapa = pixmap_icono(icono, tamano, 2.0, color)
     return QtGui.QIcon(mapa) if mapa is not None else QtGui.QIcon()
@@ -75,7 +82,7 @@ def dibujar_icono_boton(pintor, boton, centro, radio, opacidad, cache, escala):
         fuente.setPixelSize(max(8, int(radio * 0.9)))
         fuente.setBold(True)
         pintor.setFont(fuente)
-        pintor.setPen(QtGui.QColor(20, 20, 20))
+        pintor.setPen(COLOR_INICIAL_ABIERTO)
         pintor.drawText(QtCore.QRectF(x - radio, y - radio, 2 * radio, 2 * radio), Qt.AlignCenter,
                         boton["texto"][:1].upper())
     pintor.restore()

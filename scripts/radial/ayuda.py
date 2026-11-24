@@ -5,7 +5,8 @@ La tarjeta no recibe el ratón ni el teclado: solo se mira.
 """
 
 from radial import iconos
-from radial.dibujo import COLOR_BORDE, COLOR_DETALLE, COLOR_TEXTO, pixmap_icono
+from radial import dibujo
+from radial.dibujo import COLOR_BORDE, COLOR_DETALLE, COLOR_TARJETA, COLOR_TEXTO, pixmap_icono
 from radial.i18n import t
 from radial.qt import QtCore, QtGui, QtWidgets, sigue_vivo
 
@@ -121,7 +122,7 @@ class TarjetaAyuda(QtWidgets.QWidget):
         if icono:
             try:
                 lado = LADO_ICONO if iconos.es_imagen(icono) else 18
-                mapa = pixmap_icono(icono, lado, self.devicePixelRatioF(), "#ececec")
+                mapa = pixmap_icono(icono, lado, self.devicePixelRatioF(), dibujo.COLOR_ICONO_CLARO)
             except Exception:  # un icono que no se lee no impide la ayuda
                 mapa = None
         if mapa is not None:
@@ -168,5 +169,5 @@ class TarjetaAyuda(QtWidgets.QWidget):
         pintor = QtGui.QPainter(self)
         pintor.setRenderHint(QtGui.QPainter.Antialiasing)
         pintor.setPen(QtGui.QPen(COLOR_BORDE, 1))
-        pintor.setBrush(QtGui.QColor(22, 23, 26, 236))
+        pintor.setBrush(COLOR_TARJETA)
         pintor.drawRoundedRect(QtCore.QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5), 12, 12)

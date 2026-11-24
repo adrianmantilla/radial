@@ -9,7 +9,8 @@ misma interfaz que ``MenuRadial`` para que el resto del plugin no distinga.
 
 from radial import radiales as rd
 from radial.dibujo import (COLOR_ABIERTO, COLOR_AGARRE, COLOR_AGARRE_SOBRE, COLOR_BORDE_FONDO,
-                           COLOR_DETALLE, COLOR_FONDO, COLOR_ICONO_CLARO, COLOR_LINEA, COLOR_TEXTO,
+                           COLOR_DETALLE, COLOR_FONDO, COLOR_ICONO_CLARO, COLOR_INICIAL, COLOR_INICIAL_ABIERTO,
+                           COLOR_LINEA, COLOR_TEXTO,
                            mezclar, pixmap_icono)
 from radial.menu_comun import (MenuComun, dibujar_encendido, dibujar_flecha_volver,
                                  dibujar_insignia_opciones, dibujar_marca_carpeta)
@@ -350,7 +351,7 @@ class MenuPill(MenuComun, QtWidgets.QWidget):
             if self.estados[i] is True:
                 dibujar_encendido(pintor, abajo, 2.0)
             elif boton["tipo"] == "carpeta":
-                dibujar_marca_carpeta(pintor, abajo, mezclar(QtGui.QColor(236, 236, 236), QtGui.QColor(40, 40, 40), a))
+                dibujar_marca_carpeta(pintor, abajo, mezclar(COLOR_INICIAL, COLOR_INICIAL_ABIERTO, a))
             if self._muestra_opciones(i):
                 dibujar_insignia_opciones(pintor, QtCore.QPointF(centro.x() + bw * 0.36, centro.y() + bh * 0.36), 8)
         pintor.end()
@@ -358,7 +359,7 @@ class MenuPill(MenuComun, QtWidgets.QWidget):
     def _inicial(self, pintor, boton, rect, a, base):
         if boton["tipo"] == "vacio" or not boton["texto"]:
             pintor.setPen(Qt.NoPen)
-            pintor.setBrush(QtGui.QColor(255, 255, 255, 70))
+            pintor.setBrush(COLOR_AGARRE)
             pintor.drawEllipse(rect.center(), 2.5, 2.5)
             return
         fuente = QtGui.QFont(self.font())
@@ -366,6 +367,6 @@ class MenuPill(MenuComun, QtWidgets.QWidget):
         fuente.setBold(True)
         pintor.setFont(fuente)
         pintor.setOpacity(base)
-        pintor.setPen(mezclar(QtGui.QColor(236, 236, 236), QtGui.QColor(20, 20, 20), a))
+        pintor.setPen(mezclar(COLOR_INICIAL, COLOR_INICIAL_ABIERTO, a))
         pintor.drawText(rect, Qt.AlignCenter, boton["texto"][:1].upper())
         pintor.setOpacity(self.apariencia["opacidad"])

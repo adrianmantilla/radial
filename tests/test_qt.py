@@ -795,6 +795,47 @@ class PruebaOpcionesAjustes(unittest.TestCase):
 
 
 @unittest.skipIf(QtWidgets is None, "PySide6 no está instalado")
+class PruebaTema(unittest.TestCase):
+    def tearDown(self):
+        from radial import tema
+        tema.aplicar("oscuro", "")
+
+    def test_claro_y_acento(self):
+        from radial import buscador, dibujo, menu_pill, tema
+        oscuro_fondo = dibujo.COLOR_FONDO.getRgb()
+        self.assertTrue(tema.aplicar("claro", ""))
+        self.assertGreater(dibujo.COLOR_FONDO.lightness(), 200)
+        self.assertLess(dibujo.COLOR_TEXTO.lightness(), 60)
+        self.assertEqual(menu_pill.COLOR_ICONO_CLARO, "#1c1c1f")  # iconos oscuros sobre la pill clara
+        self.assertFalse(tema.aplicar("claro", ""))  # nada cambia
+        tema.aplicar("claro", "#FF9F43")
+        self.assertEqual(dibujo.COLOR_ABIERTO.name(), "#ff9f43")
+        self.assertEqual(buscador.COLOR_ELEGIDO.name(), "#ff9f43")
+        self.assertEqual(dibujo.COLOR_ICONO_OSCURO, "#141414")  # sobre naranja, icono oscuro
+        tema.aplicar("oscuro", "#4c3cff")
+        self.assertEqual(dibujo.COLOR_ICONO_OSCURO, "#f4f4f4")  # sobre un azul oscuro, icono claro
+        tema.aplicar("oscuro", "no es un color")
+        self.assertEqual(dibujo.COLOR_FONDO.getRgb(), oscuro_fondo)
+        self.assertEqual(dibujo.COLOR_ABIERTO.name(), "#f4f4f4")
+        # Se dibuja con los dos temas
+        for nombre in tema.TEMAS:
+            tema.aplicar(nombre, "#36c28a")
+            for clase in (MenuRadial, MenuPill):
+                menu = clase()
+                menu.usar_radial(rd.por_defecto())
+                self.addCleanup(menu.close)
+                self.assertFalse(menu.grab().isNull())
+
+    def test_valores(self):
+        from radial import tema
+        self.assertEqual(tema.normalizar_tema("rosa"), "oscuro")
+        self.assertEqual(tema.normalizar_acento("#ABCDEF"), "#abcdef")
+        self.assertEqual(tema.normalizar_acento("#abc"), "")
+        self.assertEqual(tema.texto_sobre("#ffffff"), "#141414")
+        self.assertEqual(tema.texto_sobre("#101010"), "#f4f4f4")
+
+
+@unittest.skipIf(QtWidgets is None, "PySide6 no está instalado")
 class PruebaAyuda(unittest.TestCase):
     def test_contenido_de_comando(self):
         info = busqueda.accion_de_comando("CenterPivot", "Menu items.Modify", "", "Centrar pivote",

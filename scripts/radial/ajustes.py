@@ -227,6 +227,37 @@ class Ajustes(object):
     def reglas(self, valor):
         self.datos["reglas"] = dict(valor)
 
+    # Aspecto: tema, color de acento e idioma de la interfaz
+    @property
+    def tema(self):
+        from radial import tema
+        return tema.normalizar_tema(self.datos.get("tema"))
+
+    @tema.setter
+    def tema(self, valor):
+        from radial import tema
+        self.datos["tema"] = tema.normalizar_tema(valor)
+
+    @property
+    def acento(self):
+        from radial import tema
+        return tema.normalizar_acento(self.datos.get("acento"))
+
+    @acento.setter
+    def acento(self, valor):
+        from radial import tema
+        self.datos["acento"] = tema.normalizar_acento(valor)
+
+    @property
+    def idioma(self):
+        """«es», «en»... o "" si no se ha elegido (entonces manda RADIAL_IDIOMA o el español)."""
+        valor = self.datos.get("idioma")
+        return valor if isinstance(valor, str) and valor.isalpha() and len(valor) <= 5 else ""
+
+    @idioma.setter
+    def idioma(self, valor):
+        self.datos["idioma"] = valor or ""
+
     @property
     def usos(self):
         """Veces que se ha lanzado cada comando de Maya desde Radial: ``{comando: veces}``."""

@@ -51,6 +51,8 @@ def _partes(texto):
 def de_qt(texto, mac=None):
     """Lo que da ``QKeySequence.toString()`` («Ctrl+Shift+E») escrito como los atajos de Maya («Ctrl+Mayús+E»).
 
+    «Mayús» sale en el idioma de la interfaz, igual que en los atajos que lee ``fuentes_maya``.
+
     En macOS, Qt llama «Ctrl» a Cmd y «Meta» a Control.
     """
     mac = sys.platform == "darwin" if mac is None else mac
@@ -66,7 +68,8 @@ def de_qt(texto, mac=None):
     if mac and "CTRL" in modificadores:
         nombres.append("Cmd")
     if "SHIFT" in modificadores:
-        nombres.append("Mayús")
+        from radial.i18n import t
+        nombres.append(t("tecla_mayus"))
     return "+".join(nombres + [tecla])
 
 
