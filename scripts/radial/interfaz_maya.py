@@ -79,7 +79,7 @@ def _radial_cambiado():
     ventana_ajustes = _ventana("ventana_ajustes")
     if ventana_ajustes:
         ventana_ajustes.fijar(bib.activo["apariencia"], ajustes().forma, ajustes().pill_vertical,
-                              ajustes().ventana_ms)
+                              ajustes().ventana_ms, len(bib.activo["botones"]))
     gestor = _ventana("gestor")
     if gestor:
         gestor.refrescar()
@@ -489,7 +489,7 @@ def abrir_ajustes():
     ventana = _ventana("ventana_ajustes")
     if ventana:
         ventana.fijar(radial_activo()["apariencia"], ajustes().forma, ajustes().pill_vertical,
-                      ajustes().ventana_ms)
+                      ajustes().ventana_ms, len(radial_activo()["botones"]))
         if not visible():
             mostrar()
         return _traer(ventana)
@@ -499,11 +499,41 @@ def abrir_ajustes():
                              al_forma=cambiar_forma, al_velocidad=_velocidad_cambiada, padre=ventana_maya(),
                              buscador=ajustes().buscador, al_buscador=cambiar_buscador,
                              opciones=_opciones(), al_opcion=cambiar_opcion, al_reglas=abrir_reglas,
-                             extra=_datos_extra(), al_extra=cambiar_extra)
+                             extra=_datos_extra(), al_extra=cambiar_extra,
+                             cantidad=len(radial_activo()["botones"]), al_cantidad=cambiar_cantidad,
+                             atajo=ajustes().atajo, al_atajo=cambiar_atajo)
     _estado["ventana_ajustes"] = ventana
     if not visible():
         mostrar()
     return _traer(ventana)
+
+
+def cambiar_cantidad(cantidad):
+    """Número de botones del menú principal (de 2 a 12)."""
+    if len(radial_activo()["botones"]) != cantidad:
+        modificar_radial(rd.cambiar_cantidad(radial_activo(), cantidad))
+
+
+def cambiar_atajo(texto):
+    """Pone (o quita, con "") el atajo de teclado del menú. Devuelve "" o el motivo por el que no se puede."""
+    from radial import atajo
+    anterior = ajustes().atajo
+    if texto == anterior:
+        return ""
+    if texto:
+        try:
+            atajo.asignar(texto, COMANDO_ALTERNAR, t("comando_anotacion"))
+        except atajo.AtajoNoValido as error:
+            ocupado = str(error)
+            return t("atajo_ocupado", comando=ocupado) if ocupado and ocupado != texto else t("atajo_no_valido")
+        except RuntimeError as error:
+            return str(error)
+    if anterior:
+        atajo.quitar(anterior)
+    ajustes().atajo = texto
+    ajustes().guardar()
+    print(t("atajo_asignado", atajo=texto) if texto else t("atajo_quitado"))
+    return ""
 
 
 def _datos_extra():

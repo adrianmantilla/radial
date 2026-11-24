@@ -9,7 +9,7 @@ from radial import automatico
 from radial import detector_tab as dt
 from radial import radiales as rd
 from radial.i18n import t
-from radial.qt import QtCore, QtWidgets
+from radial.qt import QtCore, QtGui, QtWidgets
 
 Qt = QtCore.Qt
 
@@ -128,7 +128,8 @@ class VentanaAjustes(QtWidgets.QDialog):
 
     def __init__(self, apariencia, forma, vertical, ventana_ms, al_apariencia=None, al_forma=None,
                  al_velocidad=None, padre=None, buscador=True, al_buscador=None, opciones=None,
-                 al_opcion=None, al_reglas=None, extra=None, al_extra=None):
+                 al_opcion=None, al_reglas=None, extra=None, al_extra=None, cantidad=None, al_cantidad=None,
+                 atajo="", al_atajo=None):
         super(VentanaAjustes, self).__init__(padre)
         self.setWindowTitle(t("ajustes_titulo"))
         self.setObjectName("RadialAjustes")
@@ -140,6 +141,8 @@ class VentanaAjustes(QtWidgets.QDialog):
         self._al_opcion = al_opcion
         self._al_reglas = al_reglas
         self._al_extra = al_extra
+        self._al_cantidad = al_cantidad
+        self._al_atajo = al_atajo
         opciones = dict(opciones or {})
         self.apariencia = rd.normalizar_apariencia(apariencia)
 
@@ -204,6 +207,31 @@ class VentanaAjustes(QtWidgets.QDialog):
         self.buscador.toggled.connect(lambda valor: self._al_buscador and self._al_buscador(bool(valor)))
         formulario.addRow(t("ajustes_buscador"), self.buscador)
 
+        self.cantidad = QtWidgets.QSpinBox()
+        self.cantidad.setRange(rd.MIN_BOTONES, rd.MAX_BOTONES)
+        self.cantidad.setValue(rd.normalizar_cantidad(cantidad))
+        self.cantidad.valueChanged.connect(lambda valor: self._al_cantidad and self._al_cantidad(int(valor)))
+        fila = QtWidgets.QHBoxLayout()
+        fila.addWidget(self.cantidad)
+        fila.addStretch(1)
+        formulario.addRow(t("ajustes_cantidad"), fila)
+
+        self.atajo = QtWidgets.QKeySequenceEdit()
+        if hasattr(self.atajo, "setMaximumSequenceLength"):
+            self.atajo.setMaximumSequenceLength(1)
+        self.atajo.setKeySequence(QtGui.QKeySequence(atajo or ""))
+        self.atajo.editingFinished.connect(self._atajo_elegido)
+        self.quitar_atajo = QtWidgets.QPushButton(t("ajustes_clase_quitar"))
+        self.quitar_atajo.clicked.connect(lambda *_: self._fijar_atajo(""))
+        fila = QtWidgets.QHBoxLayout()
+        fila.addWidget(self.atajo, 1)
+        fila.addWidget(self.quitar_atajo)
+        formulario.addRow(t("ajustes_atajo"), fila)
+        self.nota_atajo = QtWidgets.QLabel(t("ajustes_atajo_ayuda"))
+        self.nota_atajo.setWordWrap(True)
+        self.nota_atajo.setEnabled(False)
+        formulario.addRow("", self.nota_atajo)
+
         capa.addStretch(1)
         grupo = QtWidgets.QWidget()
         opciones_capa = QtWidgets.QVBoxLayout(grupo)
@@ -252,6 +280,7 @@ class VentanaAjustes(QtWidgets.QDialog):
 
         self.pestanas.addTab(self._grupo_extra(), t("ajustes_extra"))
         self.fijar_extra(extra or {})
+        self._atajo_bueno = atajo or ""
         capa = exterior
 
 
@@ -271,7 +300,28 @@ class VentanaAjustes(QtWidgets.QDialog):
         cerrar.clicked.connect(self.close)
         self.resize(self.sizeHint())  # que las notas de varias líneas no se corten
 
-    def fijar(self, apariencia, forma, vertical, ventana_ms):
+    def _atajo_elegido(self):
+        texto = self.atajo.keySequence().toString(QtGui.QKeySequence.PortableText)
+        self._fijar_atajo(texto)
+
+    def _fijar_atajo(self, texto):
+        """Pide el atajo a quien abre la ventana; si no se puede, enseña por qué y lo deja como estaba."""
+        error = self._al_atajo(texto) if self._al_atajo else ""
+        if error:
+            self.nota_atajo.setText(error)
+            self.nota_atajo.setEnabled(True)
+            self.atajo.setKeySequence(QtGui.QKeySequence(getattr(self, "_atajo_bueno", "")))
+            return
+        self._atajo_bueno = texto
+        self.atajo.setKeySequence(QtGui.QKeySequence(texto))
+        self.nota_atajo.setText(t("ajustes_atajo_ayuda"))
+        self.nota_atajo.setEnabled(False)
+
+    def fijar(self, apariencia, forma, vertical, ventana_ms, cantidad=None):
+        if cantidad is not None:
+            self.cantidad.blockSignals(True)
+            self.cantidad.setValue(rd.normalizar_cantidad(cantidad))
+            self.cantidad.blockSignals(False)
         self.apariencia = rd.normalizar_apariencia(apariencia)
         for clave, deslizador in self.deslizadores.items():
             deslizador.fijar(self.apariencia[clave])

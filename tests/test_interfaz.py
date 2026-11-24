@@ -348,6 +348,28 @@ class PruebaInterfaz(unittest.TestCase):
             self.im._al_soltar_tab()
         self.assertTrue(self.im.visible())
 
+    def test_numero_de_botones_del_menu(self):
+        self.im.mostrar()
+        ventana = self.im.abrir_ajustes()
+        ventana.cantidad.setValue(8)
+        self.assertEqual(len(self.im.radial_activo()["botones"]), 8)
+        self.assertEqual(self.im._menu_flotante(crear=False).num(), 8)
+        self.assertTrue(self.im.biblioteca().sin_guardar)
+
+    def test_atajo_de_teclado(self):
+        self.cmds.hotkeySet.side_effect = lambda *a, **k: "Maya_Default" if k.get("current") and k.get("query") \
+            else False
+        self.cmds.hotkeyCheck.side_effect = lambda **k: "PolyExtrude" if k.get("keyString") == "e" else ""
+        self.assertEqual(self.im.cambiar_atajo("Ctrl+Alt+R"), "")
+        self.assertEqual(self.im.ajustes().atajo, "Ctrl+Alt+R")
+        self.assertTrue(self.cmds.hotkey.called)
+        self.cmds.hotkeySet.assert_any_call("Radial", source="Maya_Default", current=True)
+        self.assertIn("PolyExtrude", self.im.cambiar_atajo("Ctrl+E"))  # no pisa los de Maya
+        self.assertEqual(self.im.ajustes().atajo, "Ctrl+Alt+R")
+        self.assertTrue(self.im.cambiar_atajo("R"))  # sin modificador no vale
+        self.assertEqual(self.im.cambiar_atajo(""), "")
+        self.assertEqual(self.im.ajustes().atajo, "")
+
     def test_volver_a_centrar(self):
         self.im._al_mover(QtCore.QPoint(10, 10))
         self.im.volver_a_centrar()

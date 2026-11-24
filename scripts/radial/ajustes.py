@@ -187,6 +187,16 @@ class Ajustes(object):
         self.datos["reglas"] = dict(valor)
 
     @property
+    def atajo(self):
+        """Atajo de teclado opcional para el menú («Ctrl+Alt+R»), o ""."""
+        valor = self.datos.get("atajo")
+        return valor if isinstance(valor, str) else ""
+
+    @atajo.setter
+    def atajo(self, valor):
+        self.datos["atajo"] = valor or ""
+
+    @property
     def aprendizaje(self):
         return self.datos.get("aprendizaje") is not False
 

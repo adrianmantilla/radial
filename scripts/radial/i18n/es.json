@@ -186,5 +186,12 @@
   "menu_pill_extra": "Pill extra",
   "menu_pill_extra_configurar": "Configurar la pill extra...",
   "ajustes_pestana_menu": "Menú",
-  "ajustes_extra_cantidad": "Número de botones"
+  "ajustes_extra_cantidad": "Número de botones",
+  "ajustes_cantidad": "Número de botones",
+  "ajustes_atajo": "Atajo de teclado",
+  "ajustes_atajo_ayuda": "Opcional, además del doble Tab (por ejemplo Ctrl+Alt+R). Necesita Ctrl, Alt o Cmd y nunca quita un atajo que Maya ya use.",
+  "atajo_ocupado": "Ese atajo ya lo usa Maya para «{comando}». Elige otro.",
+  "atajo_no_valido": "Ese atajo no vale: usa Ctrl, Alt o Cmd más una tecla.",
+  "atajo_asignado": "Radial: el atajo {atajo} muestra u oculta el menú.",
+  "atajo_quitado": "Radial: atajo quitado."
 }

@@ -187,6 +187,21 @@ class PruebaCantidad(unittest.TestCase):
         self.assertEqual(len(rd.posiciones(80, 9)), 9)
 
 
+class PruebaAtajo(unittest.TestCase):
+    def test_partes(self):
+        from radial import atajo
+        windows = atajo.partes("Ctrl+Alt+R", mac=False)
+        self.assertEqual(windows, {"keyShortcut": "r", "ctrlModifier": True, "altModifier": True,
+                                   "commandModifier": False})
+        mac = atajo.partes("Ctrl+Shift+R", mac=True)
+        self.assertEqual((mac["keyShortcut"], mac["commandModifier"], mac["ctrlModifier"]), ("R", True, False))
+        self.assertTrue(atajo.partes("Meta+F5", mac=True)["ctrlModifier"])
+        self.assertEqual(atajo.partes("Alt+Space", mac=False)["keyShortcut"], "Space")
+        for malo in ("R", "Shift+R", "", "Ctrl+", "Hyper+R", "Ctrl+Raro"):
+            with self.assertRaises(atajo.AtajoNoValido):
+                atajo.partes(malo, mac=False)
+
+
 class PruebaGlosario(unittest.TestCase):
     def test_formato(self):
         from radial.busqueda import sin_acentos
