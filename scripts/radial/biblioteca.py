@@ -1,10 +1,11 @@
 """El radial activo y la biblioteca de radiales (preconfigurados y propios).
 
-El radial activo se identifica como ``pre:<id>`` (viene con el plugin) o
-``mio:<id>`` (archivo del usuario). Mientras se edita, la copia de trabajo se
+El radial activo se identifica como ``pre:<id>`` (viene con el plugin),
+``clase:<id>`` (de la carpeta de clase que comparte el profesor) o ``mio:<id>``
+(archivo del usuario). Mientras se edita, la copia de trabajo se
 guarda en los ajustes, así los cambios no se pierden al cerrar Maya aunque
-todavía no se hayan guardado en el archivo. Los preconfigurados no se
-sobrescriben nunca: sus cambios se guardan como radial nuevo.
+todavía no se hayan guardado en el archivo. Los preconfigurados, los de clase y
+los bloqueados no se sobrescriben nunca: sus cambios se guardan como radial nuevo.
 
 No depende de Maya.
 """
@@ -15,6 +16,7 @@ from radial import radiales as rd
 
 PRE = "pre:"
 MIO = "mio:"
+CLASE = "clase:"
 
 
 class Biblioteca(object):
@@ -35,9 +37,20 @@ class Biblioteca(object):
         return PRE + pre[0][0] if pre else None
 
     @property
+    def carpeta_clase(self):
+        return self.ajustes.carpeta_clase
+
+    @property
     def es_preconfigurado(self):
+        """True si el radial activo no se puede sobrescribir (preconfigurado, de clase o bloqueado)."""
         origen = self.origen
-        return origen is None or origen.startswith(PRE)
+        return (origen is None or origen.startswith(PRE) or origen.startswith(CLASE)
+                or bool(self.activo.get("bloqueado")))
+
+    @property
+    def es_de_clase(self):
+        origen = self.origen
+        return bool(origen) and origen.startswith(CLASE)
 
     @property
     def sin_guardar(self):
@@ -59,6 +72,9 @@ class Biblioteca(object):
             return next((r for n, r in rd.preconfigurados() if n == nombre), None)
         if identificador.startswith(MIO):
             ruta = os.path.join(self.carpeta, identificador[len(MIO):] + rd.EXTENSION)
+            return ruta if os.path.isfile(ruta) else None
+        if identificador.startswith(CLASE) and self.carpeta_clase:
+            ruta = os.path.join(self.carpeta_clase, identificador[len(CLASE):] + rd.EXTENSION)
             return ruta if os.path.isfile(ruta) else None
         return None
 
@@ -83,8 +99,21 @@ class Biblioteca(object):
     def mios(self):
         return [(MIO + i, nombre) for i, _, nombre in rd.mios(self.carpeta)]
 
+    def de_clase(self):
+        """Radiales de la carpeta de clase: lista de (identificador, nombre, bloqueado)."""
+        if not self.carpeta_clase:
+            return []
+        resultado = []
+        for i, ruta, nombre in rd.mios(self.carpeta_clase):
+            try:
+                bloqueado = bool(rd.leer(ruta).get("bloqueado"))
+            except rd.RadialNoValido:
+                continue
+            resultado.append((CLASE + i, nombre, bloqueado))
+        return resultado
+
     def nombre_de(self, identificador):
-        for i, nombre in self.preconfigurados() + self.mios():
+        for i, nombre in self.preconfigurados() + self.mios() + [(c[0], c[1]) for c in self.de_clase()]:
             if i == identificador:
                 return nombre
         return None
@@ -114,6 +143,18 @@ class Biblioteca(object):
         """Descarta los cambios sin guardar."""
         return self._fijar(self.origen, self._leer_origen())
 
+    def refrescar_clase(self):
+        """Si el activo es de clase y no tiene cambios, lo vuelve a leer (el profesor pudo cambiarlo).
+
+        Devuelve True si cambió."""
+        if not self.es_de_clase or self.sin_guardar:
+            return False
+        nuevo = self._leer_origen()
+        if nuevo == self.activo:
+            return False
+        self._fijar(self.origen, nuevo)
+        return True
+
     def guardar_cambios(self):
         """Escribe la copia de trabajo en su archivo. False si es un preconfigurado."""
         if self.es_preconfigurado:
@@ -125,20 +166,26 @@ class Biblioteca(object):
         return True
 
     def guardar_como(self, nombre):
-        """Guarda la copia de trabajo como radial propio nuevo y lo activa."""
-        identificador, _, radial = rd.guardar_nuevo(self.activo, self.carpeta, nombre)
+        """Guarda la copia de trabajo como radial propio nuevo (ya sin bloquear) y lo activa."""
+        copia = dict(self.activo)
+        copia.pop("bloqueado", None)
+        identificador, _, radial = rd.guardar_nuevo(copia, self.carpeta, nombre)
         return self._fijar(MIO + identificador, radial)
 
     def importar(self, ruta):
         identificador, _, radial = rd.importar(ruta, self.carpeta)
         return self._fijar(MIO + identificador, radial)
 
-    def exportar(self, ruta, identificador=None):
-        """Escribe el radial activo (o ``identificador``) en ``ruta``."""
+    def exportar(self, ruta, identificador=None, bloqueado=False):
+        """Escribe el radial activo (o ``identificador``) en ``ruta``.
+
+        Con ``bloqueado``, los alumnos lo usan pero no lo editan (hacen una copia)."""
         if identificador is None or identificador == self.origen:
-            radial = self.activo
+            radial = dict(self.activo)
         else:
             radial = rd.leer(self._ruta(identificador))
+        if bloqueado:
+            radial["bloqueado"] = True
         if not ruta.endswith(rd.EXTENSION):
             ruta += rd.EXTENSION
         return rd.escribir(radial, ruta)
@@ -156,6 +203,7 @@ class Biblioteca(object):
 
     def duplicar(self, identificador):
         radial = rd.leer(self._ruta(identificador))
+        radial.pop("bloqueado", None)
         nuevo, _, _ = rd.guardar_nuevo(radial, self.carpeta, radial["nombre"])
         return MIO + nuevo
 

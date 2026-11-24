@@ -5,6 +5,7 @@ está abierta. El tamaño y la opacidad se guardan con el radial; la forma y la
 velocidad son del usuario.
 """
 
+from radial import automatico
 from radial import detector_tab as dt
 from radial import radiales as rd
 from radial.i18n import t
@@ -62,20 +63,102 @@ class Deslizador(QtWidgets.QWidget):
         self.cambiado.emit(self.valor())
 
 
+OPCIONES = ("carpetas", "automatico", "aprendizaje")
+
+
+class DialogoReglas(QtWidgets.QDialog):
+    """Qué radial va con cada workspace y con cada modo de selección (radial automático)."""
+
+    def __init__(self, reglas, workspaces, radiales, padre=None):
+        super(DialogoReglas, self).__init__(padre)
+        self.setWindowTitle(t("reglas_titulo"))
+        self.setObjectName("RadialReglas")
+        self.setMinimumWidth(460)
+        capa = QtWidgets.QVBoxLayout(self)
+        ayuda = QtWidgets.QLabel(t("reglas_ayuda"))
+        ayuda.setWordWrap(True)
+        capa.addWidget(ayuda)
+        self.combos = {}
+        reglas = dict(reglas or {})
+        nombres = list(workspaces or [])
+        for clave in sorted(reglas):
+            if clave.startswith("ws:") and clave[3:] not in nombres:
+                nombres.append(clave[3:])
+        for titulo, claves in ((t("reglas_workspaces"), [("ws:" + n, n) for n in nombres]),
+                               (t("reglas_modos"), [("sel:" + m, t("modo_" + m)) for m in automatico.MODOS])):
+            grupo = QtWidgets.QGroupBox(titulo)
+            formulario = QtWidgets.QFormLayout(grupo)
+            for clave, texto in claves:
+                combo = QtWidgets.QComboBox()
+                combo.addItem(t("reglas_ninguno"), "")
+                for identificador, nombre in radiales:
+                    combo.addItem(nombre, identificador)
+                indice = combo.findData(reglas.get(clave, ""))
+                combo.setCurrentIndex(max(indice, 0))
+                formulario.addRow(texto, combo)
+                self.combos[clave] = combo
+            capa.addWidget(grupo)
+        pie = QtWidgets.QHBoxLayout()
+        restaurar = QtWidgets.QPushButton(t("boton_restaurar_valores"))
+        cancelar = QtWidgets.QPushButton(t("boton_cancelar"))
+        aceptar = QtWidgets.QPushButton(t("boton_aceptar"))
+        aceptar.setDefault(True)
+        pie.addWidget(restaurar)
+        pie.addStretch(1)
+        pie.addWidget(cancelar)
+        pie.addWidget(aceptar)
+        capa.addLayout(pie)
+        restaurar.clicked.connect(self._restaurar)
+        cancelar.clicked.connect(self.reject)
+        aceptar.clicked.connect(self.accept)
+
+    def _opcion(self, clave, valor):
+        if clave == "automatico":
+            self.boton_reglas.setEnabled(valor)
+        if self._al_opcion:
+            self._al_opcion(clave, valor)
+
+    def fijar_clase(self, carpeta, avisar=False):
+        self.carpeta_clase = carpeta or ""
+        self.clase.setText(self.carpeta_clase or t("ajustes_clase_ninguna"))
+        self.quitar_clase.setEnabled(bool(self.carpeta_clase))
+        if avisar and self._al_opcion:
+            self._al_opcion("carpeta_clase", self.carpeta_clase)
+
+    def _elegir_clase(self):
+        carpeta = QtWidgets.QFileDialog.getExistingDirectory(self, t("ajustes_clase_titulo"),
+                                                             self.carpeta_clase or "")
+        if carpeta:
+            self.fijar_clase(carpeta, avisar=True)
+
+    def _restaurar(self):
+        from radial.ajustes import REGLAS_POR_DEFECTO
+        for clave, combo in self.combos.items():
+            combo.setCurrentIndex(max(combo.findData(REGLAS_POR_DEFECTO.get(clave, "")), 0))
+
+    def reglas(self):
+        return {clave: combo.currentData() for clave, combo in self.combos.items() if combo.currentData()}
+
+
 class VentanaAjustes(QtWidgets.QDialog):
-    """Avisa con ``al_apariencia(dict)``, ``al_forma(forma, vertical)``, ``al_velocidad(ms)``
-    y ``al_buscador(bool)``."""
+    """Avisa con ``al_apariencia(dict)``, ``al_forma(forma, vertical)``, ``al_velocidad(ms)``,
+    ``al_buscador(bool)``, ``al_opcion(clave, valor)`` (carpetas, automatico, aprendizaje,
+    carpeta_clase) y ``al_reglas()`` (abrir las reglas del radial automático)."""
 
     def __init__(self, apariencia, forma, vertical, ventana_ms, al_apariencia=None, al_forma=None,
-                 al_velocidad=None, padre=None, buscador=True, al_buscador=None):
+                 al_velocidad=None, padre=None, buscador=True, al_buscador=None, opciones=None,
+                 al_opcion=None, al_reglas=None):
         super(VentanaAjustes, self).__init__(padre)
         self.setWindowTitle(t("ajustes_titulo"))
         self.setObjectName("RadialAjustes")
-        self.setMinimumWidth(420)
+        self.setMinimumWidth(520)
         self._al_apariencia = al_apariencia
         self._al_forma = al_forma
         self._al_velocidad = al_velocidad
         self._al_buscador = al_buscador
+        self._al_opcion = al_opcion
+        self._al_reglas = al_reglas
+        opciones = dict(opciones or {})
         self.apariencia = rd.normalizar_apariencia(apariencia)
 
         capa = QtWidgets.QVBoxLayout(self)
@@ -134,6 +217,51 @@ class VentanaAjustes(QtWidgets.QDialog):
         self.buscador.toggled.connect(lambda valor: self._al_buscador and self._al_buscador(bool(valor)))
         formulario.addRow(t("ajustes_buscador"), self.buscador)
 
+        grupo = QtWidgets.QGroupBox(t("ajustes_opciones"))
+        opciones_capa = QtWidgets.QVBoxLayout(grupo)
+        self.casillas = {}
+        for clave in OPCIONES:
+            casilla = QtWidgets.QCheckBox(t("ajustes_" + clave))
+            casilla.setChecked(bool(opciones.get(clave, clave == "aprendizaje")))
+            casilla.toggled.connect(lambda valor, c=clave: self._opcion(c, bool(valor)))
+            self.casillas[clave] = casilla
+            if clave == "automatico":
+                fila = QtWidgets.QHBoxLayout()
+                fila.addWidget(casilla)
+                fila.addStretch(1)
+                self.boton_reglas = QtWidgets.QPushButton(t("ajustes_reglas"))
+                self.boton_reglas.clicked.connect(lambda *_: self._al_reglas and self._al_reglas())
+                self.boton_reglas.setEnabled(casilla.isChecked())
+                fila.addWidget(self.boton_reglas)
+                opciones_capa.addLayout(fila)
+            else:
+                opciones_capa.addWidget(casilla)
+            nota = QtWidgets.QLabel(t("ajustes_" + clave + "_ayuda"))
+            nota.setWordWrap(True)
+            nota.setEnabled(False)
+            nota.setContentsMargins(22, 0, 0, 4)
+            opciones_capa.addWidget(nota)
+
+        fila = QtWidgets.QHBoxLayout()
+        fila.addWidget(QtWidgets.QLabel(t("ajustes_clase")))
+        self.clase = QtWidgets.QLabel()
+        self.clase.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        fila.addWidget(self.clase, 1)
+        elegir = QtWidgets.QPushButton(t("ajustes_clase_elegir"))
+        self.quitar_clase = QtWidgets.QPushButton(t("ajustes_clase_quitar"))
+        elegir.clicked.connect(self._elegir_clase)
+        self.quitar_clase.clicked.connect(lambda *_: self.fijar_clase("", avisar=True))
+        fila.addWidget(elegir)
+        fila.addWidget(self.quitar_clase)
+        opciones_capa.addLayout(fila)
+        nota = QtWidgets.QLabel(t("ajustes_clase_ayuda"))
+        nota.setWordWrap(True)
+        nota.setEnabled(False)
+        opciones_capa.addWidget(nota)
+        capa.addWidget(grupo)
+        self.fijar_clase(opciones.get("carpeta_clase", ""))
+
+
         pie = QtWidgets.QHBoxLayout()
         restaurar = QtWidgets.QPushButton(t("boton_restaurar_valores"))
         cerrar = QtWidgets.QPushButton(t("boton_cerrar"))
@@ -148,6 +276,7 @@ class VentanaAjustes(QtWidgets.QDialog):
         self.vertical.toggled.connect(self._forma_cambiada)
         restaurar.clicked.connect(self._restaurar)
         cerrar.clicked.connect(self.close)
+        self.resize(self.sizeHint())  # que las notas de varias líneas no se corten
 
     def fijar(self, apariencia, forma, vertical, ventana_ms):
         self.apariencia = rd.normalizar_apariencia(apariencia)
@@ -184,6 +313,25 @@ class VentanaAjustes(QtWidgets.QDialog):
         self._mostrar_filas()
         if self._al_forma:
             self._al_forma(self.forma(), self.vertical.isChecked())
+
+    def _opcion(self, clave, valor):
+        if clave == "automatico":
+            self.boton_reglas.setEnabled(valor)
+        if self._al_opcion:
+            self._al_opcion(clave, valor)
+
+    def fijar_clase(self, carpeta, avisar=False):
+        self.carpeta_clase = carpeta or ""
+        self.clase.setText(self.carpeta_clase or t("ajustes_clase_ninguna"))
+        self.quitar_clase.setEnabled(bool(self.carpeta_clase))
+        if avisar and self._al_opcion:
+            self._al_opcion("carpeta_clase", self.carpeta_clase)
+
+    def _elegir_clase(self):
+        carpeta = QtWidgets.QFileDialog.getExistingDirectory(self, t("ajustes_clase_titulo"),
+                                                             self.carpeta_clase or "")
+        if carpeta:
+            self.fijar_clase(carpeta, avisar=True)
 
     def _restaurar(self):
         por_defecto = rd.normalizar_apariencia({})

@@ -10,7 +10,7 @@ from radial import ajustes as aj
 from radial import detector_tab as dt
 from radial import radiales as rd
 from radial.biblioteca import Biblioteca
-from radial.i18n import t
+from radial.i18n import sinonimos, t
 from radial.qt import QtCore, QtGui, destruir, sigue_vivo, ventana_maya
 
 MENU = "RadialMenu"
@@ -20,7 +20,8 @@ COMANDO_ALTERNAR = "RadialMostrarOcultar"
 COMANDO_CONFIGURAR = "RadialConfigurar"
 
 _estado = {"menu": None, "filtro": None, "ajustes": None, "biblioteca": None,
-           "configurador": None, "ventana_ajustes": None, "gestor": None, "buscador": None}
+           "configurador": None, "ventana_ajustes": None, "gestor": None, "buscador": None,
+           "tarjeta": None, "reloj_automatico": None, "contexto": None}
 
 
 # --- Ajustes y biblioteca -------------------------------------------------------
@@ -65,11 +66,15 @@ def _radial_cambiado():
     menu = _menu_flotante(crear=False)
     if menu:
         menu.usar_radial(bib.activo)
+        _actualizar_estados()
     configurador = _ventana("configurador")
     if configurador:
         configurador.fijar_radial(bib.activo, bib.sin_guardar, _nombre_activo())
-        configurador.boton_guardar.setText(t("boton_guardar_como_nuevo") if bib.es_preconfigurado
-                                           else t("boton_guardar"))
+        if bib.activo.get("bloqueado"):
+            configurador.boton_guardar.setText(t("boton_copia_mia"))
+        else:
+            configurador.boton_guardar.setText(t("boton_guardar_como_nuevo") if bib.es_preconfigurado
+                                               else t("boton_guardar"))
     ventana_ajustes = _ventana("ventana_ajustes")
     if ventana_ajustes:
         ventana_ajustes.fijar(bib.activo["apariencia"], ajustes().forma, ajustes().pill_vertical,
@@ -176,6 +181,21 @@ def exportar():
     print(t("exportado", ruta=ruta))
 
 
+def exportar_bloqueado():
+    """Exporta el radial activo bloqueado: en la carpeta de clase, los alumnos lo usan pero no lo cambian."""
+    inicio = os.path.join(ajustes().carpeta_clase or "", rd.nombre_de_archivo(_nombre_activo()) + rd.EXTENSION)
+    rutas = cmds.fileDialog2(fileFilter=t("filtro_radial_maya"), fileMode=0, caption=t("menu_exportar_bloqueado"),
+                             okCaption=t("boton_exportar"), startingDirectory=inicio)
+    if not rutas:
+        return
+    try:
+        ruta = biblioteca().exportar(rutas[0], bloqueado=True)
+    except (rd.RadialNoValido, OSError) as error:
+        cmds.warning(t("gestor_error", error=error))
+        return
+    print(t("exportado_bloqueado", ruta=ruta))
+
+
 # --- Menú flotante ------------------------------------------------------------
 
 def _menu_flotante(crear=True):
@@ -193,6 +213,9 @@ def _menu_flotante(crear=True):
                               al_configurar=abrir_configurador)
         menu.usar_radial(radial_activo())
         menu.al_soltar = _al_soltar
+        menu.tiene_opciones = _tiene_opciones
+        menu.al_carpeta = lambda carpeta: _actualizar_estados()
+        menu.al_sobre = _al_sobre
         _estado["menu"] = menu
         buscador = _buscador()
         buscador.activo = ajustes().buscador
@@ -229,7 +252,10 @@ def _ajustar_a_pantalla(centro, menu):
 
 
 def mostrar():
+    if biblioteca().refrescar_clase():
+        _radial_cambiado()
     menu = _menu_flotante()
+    _aplicar_automatico(anunciar=False)
     guardada = ajustes().posicion
     if guardada is not None and QtGui.QGuiApplication.screenAt(QtCore.QPoint(*guardada)) is not None:
         centro = QtCore.QPoint(*guardada)
@@ -238,12 +264,15 @@ def mostrar():
     menu.colocar(_ajustar_a_pantalla(centro, menu))
     menu.show()
     menu.raise_()
+    _actualizar_estados()
+    _reloj_automatico()
 
 
 def ocultar():
     menu = _menu_flotante(crear=False)
     if menu:
         menu.hide()
+    _ocultar_tarjeta()
 
 
 def alternar():
@@ -277,17 +306,56 @@ def volver_a_centrar():
         mostrar()
 
 
-def _al_ejecutar(indice):
+def _botones_visibles():
+    menu = _menu_flotante(crear=False)
+    return menu.botones_visibles() if menu else radial_activo()["botones"]
+
+
+def _al_ejecutar(indice, opciones=False):
     from radial import acciones
-    acciones.ejecutar(radial_activo()["botones"][indice])
+    acciones.ejecutar(_botones_visibles()[indice], opciones=opciones)
+    _actualizar_estados()
+
+
+_cache_opciones = {}
+
+
+def _tiene_opciones(boton):
+    """True si el botón es un comando con ventana de opciones (se pregunta a Maya una vez)."""
+    if boton.get("tipo") != "comando":
+        return False
+    accion = boton.get("accion", "")
+    if accion not in _cache_opciones:
+        from radial import acciones
+        _cache_opciones[accion] = acciones.comando_de_opciones(boton) is not None
+    return _cache_opciones[accion]
+
+
+def _actualizar_estados():
+    """Marca los interruptores encendidos. Se llama al mostrar el menú y tras cada clic."""
+    menu = _menu_flotante(crear=False)
+    if not menu or not menu.isVisible():
+        return
+    from radial import acciones
+    menu.fijar_estados([acciones.estado(b) for b in menu.botones_visibles()])
 
 
 def _al_soltar(indice, boton):
     """Se soltó una acción del buscador encima de un botón: pasa a ser ese botón."""
     radial = radial_activo()
-    radial["botones"][indice] = rd.normalizar_boton(boton)
+    if radial.get("bloqueado"):
+        cmds.warning(t("radial_bloqueado_aviso", nombre=_nombre_activo()))
+        return
+    menu = _menu_flotante(crear=False)
+    carpeta = menu.carpeta if menu else None
+    if carpeta is not None and radial["botones"][carpeta]["tipo"] == "carpeta":
+        radial["botones"][carpeta]["botones"][indice] = rd.normalizar_boton(boton, carpeta_permitida=False)
+        nuevo = radial["botones"][carpeta]["botones"][indice]
+    else:
+        radial["botones"][indice] = rd.normalizar_boton(boton)
+        nuevo = radial["botones"][indice]
     modificar_radial(radial)
-    print(t("buscador_asignado", texto=radial["botones"][indice]["texto"], numero=indice + 1))
+    print(t("buscador_asignado", texto=nuevo["texto"], numero=indice + 1))
 
 
 # --- Buscador -------------------------------------------------------------------
@@ -306,17 +374,27 @@ def _acciones_buscador():
     from radial import busqueda
     from radial.fuentes_maya import FuentesMaya
     fuentes = FuentesMaya()
-    acciones = [busqueda.accion_de_comando(*c) for c in fuentes.comandos()]
+    traducciones = sinonimos()
+    try:
+        atajos = fuentes.atajos()
+    except Exception:  # sin atajos el buscador sigue funcionando
+        atajos = {}
+    acciones = []
+    for nombre, categoria, descripcion in fuentes.comandos():
+        extra = traducciones.get(nombre, {})
+        acciones.append(busqueda.accion_de_comando(nombre, categoria, descripcion, extra.get("es", ""),
+                                                   extra.get("ayuda", ""), atajos.get(nombre, "")))
     for estante, botones in fuentes.estantes():
         acciones.extend(busqueda.accion_de_estante(estante, b) for b in botones)
     return acciones
 
 
-def _al_buscar(accion):
+def _al_buscar(accion, opciones=False):
     from radial import acciones, busqueda
     ajustes().recientes = busqueda.anadir_reciente(ajustes().recientes, accion)
     ajustes().guardar()
-    acciones.ejecutar(accion["boton"])
+    acciones.ejecutar(accion["boton"], opciones=opciones)
+    _actualizar_estados()
 
 
 def _devolver_foco():
@@ -372,7 +450,7 @@ def abrir_configurador():
     bib = biblioteca()
     ventana = Configurador(bib.activo, FuentesMaya(), al_cambiar=modificar_radial, al_guardar=guardar,
                            al_restaurar=descartar_cambios, puede_guardar=not bib.es_preconfigurado,
-                           padre=ventana_maya())
+                           padre=ventana_maya(), carpetas=ajustes().carpetas)
     ventana.fijar_cabecera(_nombre_activo(), bib.sin_guardar)
     _estado["configurador"] = ventana
     if not visible():
@@ -392,11 +470,154 @@ def abrir_ajustes():
     ventana = VentanaAjustes(radial_activo()["apariencia"], ajustes().forma, ajustes().pill_vertical,
                              ajustes().ventana_ms, al_apariencia=_apariencia_cambiada,
                              al_forma=cambiar_forma, al_velocidad=_velocidad_cambiada, padre=ventana_maya(),
-                             buscador=ajustes().buscador, al_buscador=cambiar_buscador)
+                             buscador=ajustes().buscador, al_buscador=cambiar_buscador,
+                             opciones=_opciones(), al_opcion=cambiar_opcion, al_reglas=abrir_reglas)
     _estado["ventana_ajustes"] = ventana
     if not visible():
         mostrar()
     return _traer(ventana)
+
+
+def _opciones():
+    a = ajustes()
+    return {"carpetas": a.carpetas, "automatico": a.automatico, "aprendizaje": a.aprendizaje,
+            "carpeta_clase": a.carpeta_clase}
+
+
+def cambiar_opcion(clave, valor):
+    """Una opción de Ajustes: carpetas, automatico, aprendizaje o carpeta_clase."""
+    setattr(ajustes(), clave, valor)
+    ajustes().guardar()
+    if clave == "carpetas":
+        configurador = _ventana("configurador")
+        if configurador:
+            configurador.carpetas = bool(valor)
+            configurador._ocultar_tipos()
+    elif clave == "automatico":
+        _estado["contexto"] = None
+        if valor:
+            _aplicar_automatico()
+        _reloj_automatico()
+    elif clave == "aprendizaje" and not valor:
+        _ocultar_tarjeta()
+    elif clave == "carpeta_clase":
+        biblioteca()._activo = None  # se vuelve a leer: si era de clase y ya no está, se usa otro
+        _radial_cambiado()
+
+
+def _todos_los_radiales():
+    bib = biblioteca()
+    clase = [(i, "{} ({})".format(n, t("menu_de_clase"))) for i, n, _ in bib.de_clase()]
+    return bib.preconfigurados() + bib.mios() + clase
+
+
+def abrir_reglas():
+    from radial import automatico
+    from radial.ventana_ajustes import DialogoReglas
+    dialogo = DialogoReglas(ajustes().reglas, automatico.workspaces_maya(), _todos_los_radiales(),
+                            padre=_ventana("ventana_ajustes") or ventana_maya())
+    if dialogo.exec_() if hasattr(dialogo, "exec_") else dialogo.exec():
+        ajustes().reglas = dialogo.reglas()
+        ajustes().guardar()
+        _estado["contexto"] = None
+        _aplicar_automatico()
+
+
+# --- Radial automático ------------------------------------------------------------
+
+def _reloj_automatico():
+    """Mientras el menú se ve y la opción está activa, mira cada poco el workspace y la selección."""
+    reloj = _estado.get("reloj_automatico")
+    if ajustes().automatico and visible():
+        if not sigue_vivo(reloj):
+            reloj = QtCore.QTimer(ventana_maya())
+            reloj.setInterval(800)
+            reloj.timeout.connect(_tic_automatico)
+            _estado["reloj_automatico"] = reloj
+        if not reloj.isActive():
+            reloj.start()
+    elif sigue_vivo(reloj):
+        reloj.stop()
+
+
+def _tic_automatico():
+    if not ajustes().automatico or not visible():
+        _reloj_automatico()
+        return
+    _aplicar_automatico()
+
+
+def _aplicar_automatico(anunciar=True):
+    """Cambia al radial de la regla que toca, solo cuando cambia el contexto.
+
+    Así, si el alumno elige otro radial a mano, se respeta hasta que cambie de
+    workspace o de modo de selección. Con cambios sin guardar no se toca nada.
+    """
+    if not ajustes().automatico:
+        return
+    from radial import automatico
+    try:
+        contexto = automatico.contexto_maya()
+    except Exception:  # nunca debe romper el menú
+        return
+    if contexto == _estado.get("contexto"):
+        return
+    _estado["contexto"] = contexto
+    bib = biblioteca()
+    identificador = automatico.elegir(ajustes().reglas, *contexto)
+    if not identificador or identificador == bib.origen or bib.sin_guardar:
+        return
+    try:
+        bib.usar(identificador)
+    except rd.RadialNoValido:
+        return
+    _radial_cambiado()
+    menu = _menu_flotante(crear=False)
+    if anunciar and menu:
+        menu.anunciar(_nombre_activo())
+
+
+# --- Modo aprendizaje -------------------------------------------------------------
+
+def _tarjeta():
+    tarjeta = _estado.get("tarjeta")
+    if not sigue_vivo(tarjeta):
+        from radial.ayuda import TarjetaAyuda
+        tarjeta = TarjetaAyuda(ventana_maya())
+        _estado["tarjeta"] = tarjeta
+    return tarjeta
+
+
+def _ocultar_tarjeta():
+    tarjeta = _estado.get("tarjeta")
+    if sigue_vivo(tarjeta):
+        tarjeta.ocultar()
+
+
+def _info_de(boton):
+    """La acción del buscador que corresponde a ``boton`` (traducción, ayuda, atajo...)."""
+    if boton.get("tipo") != "comando":
+        return {}
+    nombre = boton.get("accion", "")
+    for accion in _buscador().acciones():
+        if accion["boton"].get("tipo") == "comando" and accion["nombre"] == nombre:
+            return accion
+    return {}
+
+
+def _al_sobre(boton):
+    if not boton or not ajustes().aprendizaje:
+        _ocultar_tarjeta()
+        return
+    from radial import acciones
+    from radial.ayuda import contenido
+    try:
+        datos = contenido(boton, _info_de(boton), acciones.estado(boton), _tiene_opciones(boton))
+    except Exception:  # la ayuda nunca debe romper el menú
+        return
+    menu = _menu_flotante(crear=False)
+    if menu:
+        _tarjeta().mostrar(datos, menu)
 
 
 def _apariencia_cambiada(apariencia):
@@ -431,6 +652,15 @@ def abrir_gestor():
 
 
 def _cerrar_ventanas():
+    reloj = _estado.get("reloj_automatico")
+    if sigue_vivo(reloj):
+        reloj.stop()
+    _estado["reloj_automatico"] = None
+    tarjeta = _estado.get("tarjeta")
+    if sigue_vivo(tarjeta):
+        tarjeta.hide()
+        destruir(tarjeta)
+    _estado["tarjeta"] = None
     for clave in ("configurador", "ventana_ajustes", "gestor"):
         ventana = _ventana(clave)
         if ventana:
@@ -574,6 +804,14 @@ def _llenar_radiales(*_):
     for identificador, nombre in mios:
         cmds.menuItem(label=nombre, radioButton=identificador == origen,
                       command=lambda *_, i=identificador: usar_radial(i))
+    clase = bib.de_clase()
+    if bib.carpeta_clase:
+        cmds.menuItem(divider=True, dividerLabel=t("menu_de_clase"))
+        if not clase:
+            cmds.menuItem(label=t("menu_clase_vacia"), enable=False)
+        for identificador, nombre, bloqueado in clase:
+            cmds.menuItem(label=("\U0001F512 " if bloqueado else "") + nombre, radioButton=identificador == origen,
+                          command=lambda *_, i=identificador: usar_radial(i))
     cmds.menuItem(divider=True)
     nombre = _nombre_activo()
     if bib.es_preconfigurado:
@@ -586,6 +824,7 @@ def _llenar_radiales(*_):
     cmds.menuItem(divider=True)
     cmds.menuItem(label=t("menu_importar"), command=lambda *_: importar())
     cmds.menuItem(label=t("menu_exportar"), command=lambda *_: exportar())
+    cmds.menuItem(label=t("menu_exportar_bloqueado"), command=lambda *_: exportar_bloqueado())
     cmds.menuItem(label=t("menu_gestionar"), command=lambda *_: abrir_gestor())
 
 

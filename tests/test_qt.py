@@ -21,8 +21,9 @@ if QtWidgets is not None:
     from radial.filtro_teclado import FiltroTeclado
     from radial.menu_radial import MenuRadial
     from radial.menu_pill import MenuPill
-    from radial.configurador import Configurador
-    from radial.ventana_ajustes import VentanaAjustes
+    from radial.configurador import TIPOS_PAGINA, Configurador
+    from radial.ventana_ajustes import DialogoReglas, VentanaAjustes
+    from radial import ayuda, interruptores
     from radial.buscador import Buscador
     from radial import arrastre, busqueda
 
@@ -126,7 +127,7 @@ class PruebaFiltro(unittest.TestCase):
 class PruebaMenu(unittest.TestCase):
     def setUp(self):
         self.ejecutados, self.movidos, self.configurar = [], [], []
-        self.menu = MenuRadial(al_ejecutar=self.ejecutados.append, al_mover=self.movidos.append,
+        self.menu = MenuRadial(al_ejecutar=lambda i, opciones=False: self.ejecutados.append((i, opciones) if opciones else i), al_mover=self.movidos.append,
                                al_configurar=lambda: self.configurar.append(1))
         self.menu.usar_radial(rd.por_defecto())
         self.menu.colocar(QtCore.QPoint(400, 300))
@@ -254,7 +255,7 @@ class PruebaPill(unittest.TestCase):
         self.ejecutados, self.movidos, self.configurar = [], [], []
 
     def _pill(self, vertical):
-        pill = MenuPill(al_ejecutar=self.ejecutados.append, al_mover=self.movidos.append,
+        pill = MenuPill(al_ejecutar=lambda i, opciones=False: self.ejecutados.append((i, opciones) if opciones else i), al_mover=self.movidos.append,
                         al_configurar=lambda: self.configurar.append(1), vertical=vertical)
         pill.usar_radial(rd.por_defecto())
         pill.colocar(QtCore.QPoint(500, 400))
@@ -325,7 +326,7 @@ class PruebaConfigurador(unittest.TestCase):
 
     def test_codigo_python(self):
         self.ventana.huecos.setCurrentRow(2)
-        self.ventana.tipo.setCurrentIndex(2)  # Python
+        self.ventana.tipo.setCurrentIndex(TIPOS_PAGINA.index("python"))
         self.ventana.codigo_python.setPlainText("print('hola')")
         boton = self.cambios[-1]["botones"][2]
         self.assertEqual((boton["tipo"], boton["accion"]), ("python", "print('hola')"))
@@ -334,16 +335,16 @@ class PruebaConfigurador(unittest.TestCase):
 
     def test_vaciar_hueco(self):
         self.ventana.huecos.setCurrentRow(5)
-        self.ventana.tipo.setCurrentIndex(4)
+        self.ventana.tipo.setCurrentIndex(TIPOS_PAGINA.index("vacio"))
         self.assertEqual(self.cambios[-1]["botones"][5]["tipo"], "vacio")
 
     def test_copiar_de_estante(self):
         self.ventana.huecos.setCurrentRow(3)
-        self.ventana.tipo.setCurrentIndex(1)
+        self.ventana.tipo.setCurrentIndex(TIPOS_PAGINA.index("estante"))
         self.ventana._copiar_de_estante(self.ventana.lista_estante.item(0))
         boton = self.cambios[-1]["botones"][3]
         self.assertEqual((boton["texto"], boton["tipo"], boton["accion"]), ("Cubo", "mel", "polyCube;"))
-        self.assertEqual(self.ventana.tipo.currentIndex(), 3)  # muestra la página MEL
+        self.assertEqual(self.ventana.tipo.currentIndex(), TIPOS_PAGINA.index("mel"))
 
     def test_icono(self):
         self.ventana._cambiar(icono="estrella")
@@ -518,6 +519,191 @@ class PruebaVentanaAjustes(unittest.TestCase):
         ventana._restaurar()
         self.assertEqual(apariencias[-1]["radio"], 84)
         self.assertEqual(velocidades[-1], 250)
+
+
+def _radial_con_carpeta():
+    radial = rd.por_defecto()
+    radial["botones"][5] = rd.normalizar_boton({
+        "texto": "Más", "tipo": "carpeta",
+        "botones": [{"texto": "Cubo", "tipo": "mel", "accion": "polyCube;"}, interruptores.boton("xray")]})
+    return rd.normalizar(radial)
+
+
+@unittest.skipIf(QtWidgets is None, "PySide6 no está instalado")
+class PruebaCarpetasYEstados(unittest.TestCase):
+    def setUp(self):
+        self.ejecutados, self.carpetas, self.sobre = [], [], []
+        self.menu = MenuRadial(al_ejecutar=lambda i, opciones=False: self.ejecutados.append((i, opciones)),
+                               al_mover=lambda c: None, al_configurar=lambda: None)
+        self.menu.al_carpeta = self.carpetas.append
+        self.menu.al_sobre = self.sobre.append
+        self.menu.usar_radial(_radial_con_carpeta())
+        self.menu.colocar(QtCore.QPoint(400, 300))
+        self.menu.show()
+        self.addCleanup(self.menu.close)
+
+    def _punto(self, i):
+        x, y = rd.posiciones(self.menu.apariencia["radio"])[i]
+        return QtCore.QPoint(int(self.menu.width() / 2 + x), int(self.menu.height() / 2 + y))
+
+    def test_abrir_y_cerrar_carpeta(self):
+        _clic(self.menu, self._punto(5))
+        self.assertEqual(self.menu.carpeta, 5)
+        self.assertEqual(self.carpetas, [5])
+        self.assertEqual(self.menu.botones_visibles()[0]["texto"], "Cubo")
+        self.assertEqual(self.ejecutados, [])
+        _clic(self.menu, self._punto(0))
+        self.assertEqual(self.ejecutados, [(0, False)])
+        _clic(self.menu, QtCore.QPoint(self.menu.width() // 2, self.menu.height() // 2))
+        self.assertIsNone(self.menu.carpeta)
+        self.assertEqual(self.menu.botones_visibles()[0]["texto"], "Duplicar")
+
+    def test_al_ocultar_sale_de_la_carpeta(self):
+        self.menu.abrir_carpeta(5)
+        self.menu.hide()
+        self.assertIsNone(self.menu.carpeta)
+        self.assertIsNone(self.sobre[-1])
+
+    def test_estados_y_anuncio_se_dibujan(self):
+        self.menu.fijar_estados([True, False, None])
+        self.assertEqual(self.menu.estados[:3], [True, False, None])
+        self.assertEqual(len(self.menu.estados), rd.NUM_BOTONES)
+        self.menu.anunciar("UV y texturas")
+        self.assertFalse(self.menu.grab().isNull())
+        self.menu._quitar_anuncio()
+        self.assertEqual(self.menu.anuncio, "")
+
+    def test_al_sobre(self):
+        _clic(self.menu, self._punto(1))
+        self.assertEqual(self.sobre[0]["texto"], self.menu.botones_visibles()[1]["texto"])
+
+    def test_pill_con_carpeta(self):
+        pill = MenuPill(al_ejecutar=lambda i, opciones=False: None, al_mover=lambda c: None,
+                        al_configurar=lambda: None, vertical=False)
+        self.addCleanup(pill.close)
+        pill.usar_radial(_radial_con_carpeta())
+        pill.show()
+        pill.abrir_carpeta(5)
+        pill.anunciar("Modelado")
+        self.assertFalse(pill.grab().isNull())
+        pill.cerrar_carpeta()
+        self.assertIsNone(pill.carpeta)
+
+
+@unittest.skipIf(QtWidgets is None, "PySide6 no está instalado")
+class PruebaConfiguradorV11(unittest.TestCase):
+    def nueva(self, radial=None, carpetas=False):
+        self.cambios = []
+        ventana = Configurador(radial or rd.por_defecto(), FuentesFalsas(), al_cambiar=self.cambios.append,
+                               carpetas=carpetas)
+        self.addCleanup(ventana.close)
+        return ventana
+
+    def test_carpeta_solo_si_esta_activada(self):
+        indice = TIPOS_PAGINA.index("carpeta")
+        self.assertTrue(self.nueva().tipo.view().isRowHidden(indice))
+        self.assertFalse(self.nueva(carpetas=True).tipo.view().isRowHidden(indice))
+
+    def test_editar_dentro_de_una_carpeta(self):
+        ventana = self.nueva(_radial_con_carpeta(), carpetas=True)
+        ventana.huecos.setCurrentRow(5)
+        ventana.entrar_carpeta(5)
+        self.assertEqual(ventana.botones_nivel()[0]["texto"], "Cubo")
+        ventana.huecos.setCurrentRow(2)
+        ventana.tipo.setCurrentIndex(TIPOS_PAGINA.index("python"))
+        ventana.codigo_python.setPlainText("print(1)")
+        self.assertEqual(self.cambios[-1]["botones"][5]["botones"][2]["accion"], "print(1)")
+        ventana.salir_carpeta()
+        self.assertIsNone(ventana.carpeta)
+
+    def test_interruptor(self):
+        ventana = self.nueva()
+        ventana.huecos.setCurrentRow(1)
+        ventana.tipo.setCurrentIndex(TIPOS_PAGINA.index("interruptor"))
+        ventana._interruptor_elegido(ventana.lista_interruptores.item(1))
+        boton = self.cambios[-1]["botones"][1]
+        self.assertEqual(interruptores.clave_de(boton), interruptores.ORDEN[1])
+        self.assertEqual(ventana.tipo.currentIndex(), TIPOS_PAGINA.index("interruptor"))
+
+    def test_bloqueado(self):
+        radial = rd.por_defecto()
+        radial["bloqueado"] = True
+        ventana = self.nueva(radial)
+        ventana.fijar_cabecera("Examen", False)
+        self.assertFalse(ventana.texto.isEnabled())
+        self.assertFalse(ventana.tipo.isEnabled())
+        self.assertTrue(ventana.boton_guardar.isEnabled())
+        self.assertIn("profesor", ventana.cabecera.text())
+
+
+@unittest.skipIf(QtWidgets is None, "PySide6 no está instalado")
+class PruebaOpcionesAjustes(unittest.TestCase):
+    def test_opciones(self):
+        cambios, reglas = [], []
+        ventana = VentanaAjustes(rd.normalizar_apariencia({}), "radial", False, 250,
+                                 opciones={"carpetas": False, "automatico": False, "aprendizaje": True,
+                                           "carpeta_clase": ""},
+                                 al_opcion=lambda c, v: cambios.append((c, v)), al_reglas=lambda: reglas.append(1))
+        self.addCleanup(ventana.close)
+        self.assertFalse(ventana.casillas["carpetas"].isChecked())
+        self.assertTrue(ventana.casillas["aprendizaje"].isChecked())
+        self.assertFalse(ventana.boton_reglas.isEnabled())
+        ventana.casillas["automatico"].setChecked(True)
+        self.assertEqual(cambios[-1], ("automatico", True))
+        self.assertTrue(ventana.boton_reglas.isEnabled())
+        ventana.boton_reglas.click()
+        self.assertEqual(reglas, [1])
+        ventana.fijar_clase("/red/clase", avisar=True)
+        self.assertEqual(cambios[-1], ("carpeta_clase", "/red/clase"))
+        ventana.quitar_clase.click()
+        self.assertEqual(cambios[-1], ("carpeta_clase", ""))
+        self.assertFalse(ventana.quitar_clase.isEnabled())
+
+    def test_reglas(self):
+        dialogo = DialogoReglas({"ws:Animation": "pre:3_animacion"}, ["Modeling - Standard"],
+                                [("pre:1_modelado", "Modelado"), ("pre:3_animacion", "Animación")])
+        self.addCleanup(dialogo.close)
+        self.assertIn("ws:Animation", dialogo.combos)  # aunque Maya no lo liste
+        self.assertIn("sel:uv", dialogo.combos)
+        combo = dialogo.combos["sel:caras"]
+        combo.setCurrentIndex(combo.findData("pre:1_modelado"))
+        self.assertEqual(dialogo.reglas(), {"ws:Animation": "pre:3_animacion", "sel:caras": "pre:1_modelado"})
+
+
+@unittest.skipIf(QtWidgets is None, "PySide6 no está instalado")
+class PruebaAyuda(unittest.TestCase):
+    def test_contenido_de_comando(self):
+        info = busqueda.accion_de_comando("CenterPivot", "Menu items.Modify", "", "Centrar pivote",
+                                          "Pone el pivote en el centro.", "Ctrl+E")
+        datos = ayuda.contenido({"texto": "Pivote", "tipo": "comando", "accion": "CenterPivot"}, info,
+                                opciones=True)
+        self.assertEqual(datos["titulo"], "Centrar pivote")
+        self.assertIn("CenterPivot", datos["subtitulo"])
+        self.assertEqual(datos["descripcion"], "Pone el pivote en el centro.")
+        self.assertEqual(len(datos["lineas"]), 2)
+
+    def test_vacio_e_interruptor(self):
+        self.assertIsNone(ayuda.contenido(rd.boton_vacio()))
+        datos = ayuda.contenido(interruptores.boton("xray"), encendido=True)
+        self.assertTrue(any("encendido" in linea for linea in datos["lineas"]))
+
+    def test_tarjeta_junto_al_menu(self):
+        menu = MenuRadial(al_ejecutar=lambda i, opciones=False: None, al_mover=lambda c: None,
+                          al_configurar=lambda: None)
+        menu.usar_radial(rd.por_defecto())
+        menu.colocar(QtCore.QPoint(400, 300))
+        menu.show()
+        self.addCleanup(menu.close)
+        tarjeta = ayuda.TarjetaAyuda()
+        self.addCleanup(tarjeta.close)
+        self.assertTrue(tarjeta.testAttribute(Qt.WA_TransparentForMouseEvents))
+        tarjeta.mostrar(ayuda.contenido(menu.botones_visibles()[0]), menu)
+        tarjeta._aparecer()
+        self.assertTrue(tarjeta.isVisible())
+        self.assertFalse(tarjeta.geometry().intersects(menu.geometry()))
+        self.assertFalse(tarjeta.grab().isNull())
+        tarjeta.ocultar()
+        self.assertFalse(tarjeta.isVisible())
 
 
 if __name__ == "__main__":

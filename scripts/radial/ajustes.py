@@ -12,6 +12,15 @@ from radial import radiales as rd
 
 FORMAS = ("radial", "pill")
 
+# Radial automático: qué radial va con cada workspace de Maya (se cambia en Ajustes).
+REGLAS_POR_DEFECTO = {
+    "ws:Modeling - Standard": "pre:1_modelado",
+    "ws:Modeling - Expert": "pre:1_modelado",
+    "ws:UV Editing": "pre:2_uv_texturas",
+    "ws:Animation": "pre:3_animacion",
+    "ws:Rendering": "pre:4_render_arnold",
+}
+
 _ARCHIVO = "ajustes.json"
 
 
@@ -132,3 +141,55 @@ class Ajustes(object):
     @recientes.setter
     def recientes(self, valor):
         self.datos["recientes"] = list(valor)
+
+    # Carpeta de clase: radiales que comparte el profesor (también con RADIAL_CLASE)
+    @property
+    def carpeta_clase(self):
+        valor = self.datos.get("carpeta_clase")
+        if isinstance(valor, str) and valor.strip():
+            return valor.strip()
+        return os.environ.get("RADIAL_CLASE", "").strip()
+
+    @carpeta_clase.setter
+    def carpeta_clase(self, valor):
+        if valor:
+            self.datos["carpeta_clase"] = str(valor)
+        else:
+            self.datos.pop("carpeta_clase", None)
+
+    # Opciones que se activan en Ajustes
+    @property
+    def carpetas(self):
+        return self.datos.get("carpetas") is True
+
+    @carpetas.setter
+    def carpetas(self, valor):
+        self.datos["carpetas"] = bool(valor)
+
+    @property
+    def automatico(self):
+        return self.datos.get("automatico") is True
+
+    @automatico.setter
+    def automatico(self, valor):
+        self.datos["automatico"] = bool(valor)
+
+    @property
+    def reglas(self):
+        """Radial automático: ``{"ws:<workspace>" o "sel:<modo>": identificador}``."""
+        valor = self.datos.get("reglas")
+        if not isinstance(valor, dict):
+            return dict(REGLAS_POR_DEFECTO)
+        return {k: v for k, v in valor.items() if isinstance(k, str) and isinstance(v, str) and v}
+
+    @reglas.setter
+    def reglas(self, valor):
+        self.datos["reglas"] = dict(valor)
+
+    @property
+    def aprendizaje(self):
+        return self.datos.get("aprendizaje") is not False
+
+    @aprendizaje.setter
+    def aprendizaje(self, valor):
+        self.datos["aprendizaje"] = bool(valor)

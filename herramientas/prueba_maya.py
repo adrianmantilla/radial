@@ -1,4 +1,4 @@
-"""Prueba de Radial 1.0 dentro de Maya, sin interfaz (herramienta de desarrollo).
+"""Prueba de Radial 1.1 dentro de Maya, sin interfaz (herramienta de desarrollo).
 
 Desde la terminal, con el mayapy de cada versión:
 
@@ -81,6 +81,43 @@ def main():
         iconos = []
     comprobar(bool(iconos), "los iconos de Maya se encuentran ({})".format(len(iconos)))
 
+    # 1.1: buscador en español, atajos, opciones, interruptores y radial automático
+    from radial import acciones as acc, automatico, interruptores
+    from radial.i18n import sinonimos
+    existentes = {c[0] for c in comandos}
+    traducidos = sinonimos("es")
+    faltan = sorted(n for n in traducidos if n not in existentes and not acc.comando_existe(n))
+    comprobar(len(faltan) <= len(traducidos) // 10,
+              "los comandos traducidos existen ({} de {})".format(len(traducidos) - len(faltan), len(traducidos)))
+    if faltan:
+        print("        no existen: " + ", ".join(faltan))
+    atajos = fuentes.atajos()
+    comprobar(isinstance(atajos, dict), "los atajos de teclado se leen ({})".format(len(atajos)))
+    comprobar(acc.comando_de_opciones({"tipo": "comando", "accion": "DuplicateSpecial"}) is not None,
+              "Mayús + clic encuentra DuplicateSpecialOptions")
+    for clave in interruptores.ORDEN:
+        try:
+            antes = interruptores.encendido(clave)
+            comprobar(antes in (True, False), "el interruptor {} se lee".format(clave))
+        except Exception as error:  # noqa: BLE001
+            comprobar(False, "el interruptor {} se lee ({})".format(clave, error))
+    for clave in ("snap_rejilla", "snap_vertice", "simetria"):
+        try:
+            antes = interruptores.encendido(clave)
+            interruptores.alternar(clave)
+            cambiado = interruptores.encendido(clave) != antes
+            interruptores.alternar(clave)
+            comprobar(cambiado and interruptores.encendido(clave) == antes,
+                      "el interruptor {} se enciende y se apaga".format(clave))
+        except Exception as error:  # noqa: BLE001
+            comprobar(False, "el interruptor {} se enciende y se apaga ({})".format(clave, error))
+    try:
+        contexto = automatico.contexto_maya()
+        comprobar(len(contexto) == 2, "el radial automático lee el contexto {}".format(contexto))
+    except Exception as error:  # noqa: BLE001
+        comprobar(False, "el radial automático lee el contexto ({})".format(error))
+    print("        workspaces: " + ", ".join(automatico.workspaces_maya()))
+
     # Biblioteca: guardar, exportar e importar en una carpeta temporal
     import tempfile
     from radial import ajustes as aj, biblioteca as bib
@@ -98,6 +135,13 @@ def main():
         b.importar(ruta)
         comprobar(b.activo["nombre"].startswith("Mi prueba") and len(b.mios()) == 2,
                   "importar el archivo exportado")
+        clase = os.path.join(tmp, "clase")
+        os.makedirs(clase)
+        b.exportar(os.path.join(clase, "examen"), bloqueado=True)
+        b.ajustes.carpeta_clase = clase
+        b.usar("clase:examen")
+        comprobar(b.es_de_clase and b.es_preconfigurado and not b.guardar_cambios(),
+                  "un radial de clase bloqueado no se sobrescribe")
 
     cmds.unloadPlugin("radial_plugin")
     comprobar(not cmds.pluginInfo("radial_plugin", query=True, loaded=True), "el plugin se descarga")

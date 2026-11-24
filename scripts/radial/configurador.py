@@ -5,7 +5,7 @@ el texto, el icono y la acción del hueco elegido. Cada cambio se aplica al
 momento en el menú; «Guardar» lo escribe en el archivo del radial.
 """
 
-from radial import iconos
+from radial import iconos, interruptores
 from radial import radiales as rd
 from radial.dibujo import qicono
 from radial.i18n import t
@@ -13,7 +13,14 @@ from radial.qt import QtCore, QtGui, QtWidgets
 
 Qt = QtCore.Qt
 
-TIPOS_PAGINA = ("comando", "estante", "python", "mel", "vacio")
+TIPOS_PAGINA = ("comando", "estante", "interruptor", "python", "mel", "carpeta", "vacio")
+
+
+def pagina_de(boton):
+    """Qué página del configurador corresponde a ``boton``."""
+    if interruptores.clave_de(boton):
+        return "interruptor"
+    return boton["tipo"]
 
 
 def _titulo_boton(boton):
@@ -74,7 +81,7 @@ class Configurador(QtWidgets.QDialog):
     """``al_cambiar(radial)`` se llama con cada cambio; ``al_guardar()`` al pulsar Guardar."""
 
     def __init__(self, radial, fuentes, al_cambiar=None, al_guardar=None, al_restaurar=None,
-                 puede_guardar=True, padre=None):
+                 puede_guardar=True, padre=None, carpetas=False):
         super(Configurador, self).__init__(padre)
         self.setWindowTitle(t("config_titulo"))
         self.setObjectName("RadialConfigurador")
@@ -84,22 +91,31 @@ class Configurador(QtWidgets.QDialog):
         self._al_guardar = al_guardar
         self._al_restaurar = al_restaurar
         self.radial = rd.normalizar(radial)
+        self.carpeta = None          # índice de la carpeta que se está editando
+        self.carpetas = carpetas     # si se ofrece el tipo «Carpeta»
         self._cargando = False
         self._construir(puede_guardar)
+        self.bloqueado = False
         self._llenar_huecos()
         self.huecos.setCurrentRow(0)
+        self.fijar_bloqueado(self.radial.get("bloqueado", False))
 
     # --- Construcción ---------------------------------------------------------
 
     def _construir(self, puede_guardar):
         capa = QtWidgets.QVBoxLayout(self)
         self.cabecera = QtWidgets.QLabel()
+        self.cabecera.setWordWrap(True)
         capa.addWidget(self.cabecera)
 
         cuerpo = QtWidgets.QHBoxLayout()
         capa.addLayout(cuerpo, 1)
 
         izquierda = QtWidgets.QVBoxLayout()
+        self.boton_volver = QtWidgets.QPushButton()
+        self.boton_volver.setVisible(False)
+        self.boton_volver.clicked.connect(self.salir_carpeta)
+        izquierda.addWidget(self.boton_volver)
         self.huecos = QtWidgets.QListWidget()
         self.huecos.setFixedWidth(210)
         self.huecos.setIconSize(QtCore.QSize(20, 20))
@@ -158,10 +174,12 @@ class Configurador(QtWidgets.QDialog):
         self.paginas = QtWidgets.QStackedWidget()
         self.paginas.addWidget(self._pagina_comandos())
         self.paginas.addWidget(self._pagina_estante())
+        self.paginas.addWidget(self._pagina_interruptor())
         self.codigo_python = self._editor_codigo()
         self.codigo_mel = self._editor_codigo()
-        self.paginas.addWidget(self.codigo_python)
+        self.paginas.addWidget(self._pagina_python())
         self.paginas.addWidget(self.codigo_mel)
+        self.paginas.addWidget(self._pagina_carpeta())
         vacio = QtWidgets.QLabel(t("config_vacio_ayuda"))
         vacio.setAlignment(Qt.AlignTop | Qt.AlignLeft)
         vacio.setWordWrap(True)
@@ -194,6 +212,7 @@ class Configurador(QtWidgets.QDialog):
         self.tipo.currentIndexChanged.connect(self._tipo_cambiado)
         self.codigo_python.textChanged.connect(lambda: self._codigo_cambiado("python", self.codigo_python))
         self.codigo_mel.textChanged.connect(lambda: self._codigo_cambiado("mel", self.codigo_mel))
+        self.estado_python.textEdited.connect(lambda *_: self._codigo_cambiado("python", self.codigo_python))
         self.boton_probar.clicked.connect(self._probar)
         self.boton_restaurar.clicked.connect(self._restaurar)
         self.boton_guardar.clicked.connect(self._guardar)
@@ -230,6 +249,50 @@ class Configurador(QtWidgets.QDialog):
         self.lista_comandos.currentItemChanged.connect(self._comando_elegido)
         return pagina
 
+    def _pagina_interruptor(self):
+        pagina = QtWidgets.QWidget()
+        capa = QtWidgets.QVBoxLayout(pagina)
+        capa.setContentsMargins(0, 0, 0, 0)
+        ayuda = QtWidgets.QLabel(t("config_interruptor_ayuda"))
+        ayuda.setWordWrap(True)
+        self.lista_interruptores = QtWidgets.QListWidget()
+        self.lista_interruptores.setIconSize(QtCore.QSize(20, 20))
+        for clave in interruptores.ORDEN:
+            texto, detalle, icono = interruptores.INTERRUPTORES[clave]
+            item = QtWidgets.QListWidgetItem(qicono(icono), " ".join(p for p in (texto, detalle) if p))
+            item.setData(Qt.UserRole, clave)
+            self.lista_interruptores.addItem(item)
+        self.lista_interruptores.itemClicked.connect(self._interruptor_elegido)
+        capa.addWidget(ayuda)
+        capa.addWidget(self.lista_interruptores)
+        return pagina
+
+    def _pagina_python(self):
+        pagina = QtWidgets.QWidget()
+        capa = QtWidgets.QVBoxLayout(pagina)
+        capa.setContentsMargins(0, 0, 0, 0)
+        capa.addWidget(self.codigo_python, 1)
+        fila = QtWidgets.QHBoxLayout()
+        fila.addWidget(QtWidgets.QLabel(t("config_estado_python")))
+        self.estado_python = QtWidgets.QLineEdit()
+        self.estado_python.setPlaceholderText(t("config_estado_python_ayuda"))
+        fila.addWidget(self.estado_python, 1)
+        capa.addLayout(fila)
+        return pagina
+
+    def _pagina_carpeta(self):
+        pagina = QtWidgets.QWidget()
+        capa = QtWidgets.QVBoxLayout(pagina)
+        capa.setContentsMargins(0, 0, 0, 0)
+        ayuda = QtWidgets.QLabel(t("config_carpeta_ayuda"))
+        ayuda.setWordWrap(True)
+        self.boton_abrir_carpeta = QtWidgets.QPushButton(t("config_abrir_carpeta"))
+        self.boton_abrir_carpeta.clicked.connect(lambda: self.entrar_carpeta(self.indice))
+        capa.addWidget(ayuda)
+        capa.addWidget(self.boton_abrir_carpeta, 0, Qt.AlignLeft)
+        capa.addStretch(1)
+        return pagina
+
     def _pagina_estante(self):
         pagina = QtWidgets.QWidget()
         capa = QtWidgets.QVBoxLayout(pagina)
@@ -254,29 +317,89 @@ class Configurador(QtWidgets.QDialog):
     def indice(self):
         return max(0, self.huecos.currentRow())
 
+    def botones_nivel(self):
+        """Los seis botones que se están editando: los del radial o los de una carpeta."""
+        if self.carpeta is not None:
+            return self.radial["botones"][self.carpeta]["botones"]
+        return self.radial["botones"]
+
     @property
     def boton(self):
-        return self.radial["botones"][self.indice]
+        return self.botones_nivel()[self.indice]
+
+    def _fijar_boton(self, boton):
+        self.botones_nivel()[self.indice] = boton
+
+    def entrar_carpeta(self, indice):
+        if self.carpeta is not None or self.radial["botones"][indice]["tipo"] != "carpeta":
+            return
+        self.carpeta = indice
+        self._nivel_cambiado(0)
+
+    def salir_carpeta(self):
+        if self.carpeta is None:
+            return
+        fila, self.carpeta = self.carpeta, None
+        self._nivel_cambiado(fila)
+
+    def _nivel_cambiado(self, fila):
+        dentro = self.carpeta is not None
+        self.boton_volver.setVisible(dentro)
+        if dentro:
+            self.boton_volver.setText(t("config_volver_carpeta", nombre=self.radial["botones"][self.carpeta]["texto"]
+                                        or t("tipo_carpeta")))
+        self._ocultar_tipos()
+        self._llenar_huecos()
+        self.huecos.setCurrentRow(fila)
+        self._mostrar_hueco(fila)
+
+    def _ocultar_tipos(self):
+        """«Carpeta» solo se ofrece si está activada en Ajustes y no se está dentro de otra."""
+        indice = TIPOS_PAGINA.index("carpeta")
+        es_carpeta = self.carpeta is None and self.huecos.currentRow() >= 0 and self.boton["tipo"] == "carpeta"
+        visible = (self.carpetas and self.carpeta is None) or es_carpeta
+        self.tipo.view().setRowHidden(indice, not visible)
+        item = self.tipo.model().item(indice)
+        if item is not None:
+            flags = item.flags()
+            item.setFlags(flags | Qt.ItemIsEnabled if visible else flags & ~Qt.ItemIsEnabled)
+
+    def fijar_bloqueado(self, bloqueado):
+        """Un radial bloqueado (de clase) se ve pero no se cambia; Guardar hace una copia."""
+        self.bloqueado = bool(bloqueado)
+        for widget in (self.texto, self.detalle, self.lista_iconos, self.boton_icono_maya, self.boton_sin_icono,
+                       self.tipo, self.paginas, self.boton_restaurar):
+            widget.setEnabled(not self.bloqueado)
+        self.huecos.setDragDropMode(QtWidgets.QAbstractItemView.NoDragDrop if self.bloqueado
+                                    else QtWidgets.QAbstractItemView.InternalMove)
+        if self.bloqueado:
+            self.boton_guardar.setText(t("boton_copia_mia"))
 
     def fijar_radial(self, radial, sin_guardar=False, nombre=None):
         """Recarga la ventana con ``radial`` (por ejemplo tras Restaurar o cambiar de radial)."""
         fila = self.indice
         self.radial = rd.normalizar(radial)
+        if self.carpeta is not None and self.radial["botones"][self.carpeta]["tipo"] != "carpeta":
+            self.carpeta = None
+            self.boton_volver.setVisible(False)
         self._llenar_huecos()
         self.huecos.setCurrentRow(fila)
         self._mostrar_hueco(fila)
         self.fijar_cabecera(nombre or self.radial["nombre"], sin_guardar)
+        self.fijar_bloqueado(self.radial.get("bloqueado", False))
 
     def fijar_cabecera(self, nombre, sin_guardar):
         texto = t("config_cabecera", nombre=nombre)
         if sin_guardar:
             texto += "  ·  " + t("sin_guardar")
+        if self.radial.get("bloqueado"):
+            texto += "  ·  " + t("config_bloqueado")
         self.cabecera.setText(texto)
 
     def _llenar_huecos(self):
         self.huecos.blockSignals(True)
         self.huecos.clear()
-        for i, boton in enumerate(self.radial["botones"]):
+        for i, boton in enumerate(self.botones_nivel()):
             item = QtWidgets.QListWidgetItem(qicono(boton["icono"]) if boton["icono"] else QtGui.QIcon(),
                                              "{}   {}".format(i + 1, _titulo_boton(boton)))
             item.setData(Qt.UserRole, i)
@@ -284,7 +407,7 @@ class Configurador(QtWidgets.QDialog):
         self.huecos.blockSignals(False)
 
     def _actualizar_hueco(self, i):
-        boton = self.radial["botones"][i]
+        boton = self.botones_nivel()[i]
         item = self.huecos.item(i)
         item.setText("{}   {}".format(i + 1, _titulo_boton(boton)))
         item.setIcon(qicono(boton["icono"]) if boton["icono"] else QtGui.QIcon())
@@ -293,13 +416,21 @@ class Configurador(QtWidgets.QDialog):
         if fila < 0:
             return
         self._cargando = True
-        boton = self.radial["botones"][fila]
+        boton = self.botones_nivel()[fila]
+        self._ocultar_tipos()
         self.texto.setText(boton["texto"])
         self.detalle.setText(boton["detalle"])
         self._mostrar_icono(boton["icono"])
         tipo = boton["tipo"]
-        self.tipo.setCurrentIndex(TIPOS_PAGINA.index(tipo))
-        self.paginas.setCurrentIndex(TIPOS_PAGINA.index(tipo))
+        pagina = pagina_de(boton)
+        self.tipo.setCurrentIndex(TIPOS_PAGINA.index(pagina))
+        self.paginas.setCurrentIndex(TIPOS_PAGINA.index(pagina))
+        self.lista_interruptores.clearSelection()
+        if pagina == "interruptor":
+            for i in range(self.lista_interruptores.count()):
+                item = self.lista_interruptores.item(i)
+                item.setSelected(item.data(Qt.UserRole) == interruptores.clave_de(boton))
+        self.estado_python.setText(boton.get("estado", "") if pagina == "python" else "")
         self.codigo_python.setPlainText(boton["accion"] if tipo == "python" else "")
         self.codigo_mel.setPlainText(boton["accion"] if tipo == "mel" else "")
         if tipo == "comando":
@@ -325,21 +456,28 @@ class Configurador(QtWidgets.QDialog):
         boton = self.boton
         if boton["tipo"] == "vacio":
             self.estado.setText("")
+        elif boton["tipo"] == "carpeta":
+            llenos = sum(1 for b in boton["botones"] if b["tipo"] != "vacio")
+            self.estado.setText(t("config_estado_carpeta", numero=llenos))
         elif boton["tipo"] == "comando":
             nombres = {c[0] for c in self.fuentes.comandos()}
             self.estado.setText(t("config_estado_comando", comando=boton["accion"])
                                 if boton["accion"] in nombres else t("config_estado_sin_comando"))
         else:
             self.estado.setText(t("config_estado_codigo"))
-        self.boton_probar.setEnabled(boton["tipo"] != "vacio")
+        self.boton_probar.setEnabled(boton["tipo"] not in ("vacio", "carpeta"))
 
     def _cambiar(self, **cambios):
         if self._cargando:
             return
         boton = dict(self.boton)
         boton.update(cambios)
-        self.radial["botones"][self.indice] = rd.normalizar_boton(boton) if boton["tipo"] == "vacio" \
+        if boton["tipo"] != "python" or interruptores.clave_de(boton):
+            if "estado" not in cambios and pagina_de(boton) != "interruptor":
+                boton.pop("estado", None)
+        nuevo = rd.normalizar_boton(boton) if boton["tipo"] in ("vacio", "carpeta") \
             else self._normalizar_sin_vaciar(boton)
+        self._fijar_boton(nuevo)
         if "icono" in cambios:
             self._mostrar_icono(self.boton["icono"])
         self._actualizar_hueco(self.indice)
@@ -352,6 +490,8 @@ class Configurador(QtWidgets.QDialog):
         limpio = rd.normalizar_boton(dict(boton, accion=boton.get("accion") or " "))
         limpio["accion"] = boton.get("accion", "")
         limpio["tipo"] = boton["tipo"]
+        if boton.get("estado"):
+            limpio["estado"] = boton["estado"]
         return limpio
 
     def _avisar(self):
@@ -366,23 +506,41 @@ class Configurador(QtWidgets.QDialog):
         if clave == "estante":
             self._asegurar_estantes()
             return
+        if clave == "interruptor":
+            return  # se elige en la lista
         if clave == "comando":
             self._asegurar_comandos()
         if self._cargando:
             return
         if clave == "vacio":
             self._cambiar(tipo="vacio", accion="")
+        elif clave == "carpeta":
+            self._cambiar(tipo="carpeta", accion="", botones=[])
         elif clave == "comando":
             self._cambiar(tipo="comando", accion="")
             self.buscar_comando.setFocus()
         else:
             editor = self.codigo_python if clave == "python" else self.codigo_mel
-            self._cambiar(tipo=clave, accion=editor.toPlainText())
+            cambios = {"tipo": clave, "accion": editor.toPlainText()}
+            if clave == "python":
+                cambios["estado"] = self.estado_python.text()
+            self._cambiar(**cambios)
 
     def _codigo_cambiado(self, tipo, editor):
         if self._cargando or TIPOS_PAGINA[self.tipo.currentIndex()] != tipo:
             return
-        self._cambiar(tipo=tipo, accion=editor.toPlainText())
+        cambios = {"tipo": tipo, "accion": editor.toPlainText()}
+        if tipo == "python":
+            cambios["estado"] = self.estado_python.text()
+        self._cambiar(**cambios)
+
+    def _interruptor_elegido(self, item):
+        if self._cargando:
+            return
+        self._fijar_boton(rd.normalizar_boton(interruptores.boton(item.data(Qt.UserRole))))
+        self._actualizar_hueco(self.indice)
+        self._mostrar_hueco(self.indice)
+        self._avisar()
 
     def _asegurar_comandos(self):
         if not self._comandos_cargados:
@@ -454,7 +612,7 @@ class Configurador(QtWidgets.QDialog):
     def _copiar_de_estante(self, item):
         boton = dict(item.data(Qt.UserRole))
         boton.pop("descripcion", None)
-        self.radial["botones"][self.indice] = rd.normalizar_boton(boton)
+        self._fijar_boton(rd.normalizar_boton(boton, carpeta_permitida=self.carpeta is None))
         self._actualizar_hueco(self.indice)
         self._mostrar_hueco(self.indice)
         self._avisar()
@@ -466,7 +624,8 @@ class Configurador(QtWidgets.QDialog):
 
     def _reordenado(self, *_):
         orden = [self.huecos.item(i).data(Qt.UserRole) for i in range(self.huecos.count())]
-        self.radial["botones"] = [self.radial["botones"][i] for i in orden]
+        nivel = self.botones_nivel()
+        nivel[:] = [nivel[i] for i in orden]
         fila = self.huecos.currentRow()
         self._llenar_huecos()
         self.huecos.setCurrentRow(fila)

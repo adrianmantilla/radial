@@ -25,7 +25,8 @@ if QtWidgets is not None:
     # Se cargan antes de poner el Maya falso: al quitarlo, mock.patch.dict borra de
     # sys.modules lo importado mientras tanto, y borrar módulos de Qt rompe Python.
     for _modulo in ("biblioteca", "configurador", "filtro_teclado", "gestor_radiales",
-                    "menu_pill", "menu_radial", "qt", "ventana_ajustes", "buscador", "busqueda", "arrastre"):
+                    "menu_pill", "menu_radial", "qt", "ventana_ajustes", "buscador", "busqueda", "arrastre",
+                    "ayuda", "automatico", "interruptores", "menu_comun"):
         importlib.import_module("radial." + _modulo)
 
 
@@ -34,7 +35,7 @@ def _maya_falso(carpeta):
     cmds.internalVar.return_value = carpeta + os.sep
     cmds.about.side_effect = lambda **k: False if k.get("batch") else "2027"
     cmds.getPanel.side_effect = lambda **k: "modelPanel4" if k.get("underPointer") else "modelPanel"
-    cmds.runTimeCommand.return_value = True
+    cmds.runTimeCommand.side_effect = lambda *a, **k: [] if k.get("query") else True
     maya = types.ModuleType("maya")
     maya.cmds = cmds
     maya.mel = mock.MagicMock(name="mel")
@@ -180,6 +181,69 @@ class PruebaInterfaz(unittest.TestCase):
         self.im._al_soltar(3, {"texto": "Extrude", "tipo": "comando", "accion": "PolyExtrude"})
         self.assertEqual(self.im.radial_activo()["botones"][3]["accion"], "PolyExtrude")
         self.assertTrue(self.im.biblioteca().sin_guardar)
+
+    def test_opciones_desde_ajustes(self):
+        ventana = self.im.abrir_ajustes()
+        self.assertFalse(ventana.casillas["carpetas"].isChecked())
+        ventana.casillas["carpetas"].setChecked(True)
+        self.assertTrue(self.im.ajustes().carpetas)
+        configurador = self.im.abrir_configurador()
+        self.assertTrue(configurador.carpetas)
+        ventana.casillas["aprendizaje"].setChecked(False)
+        self.assertFalse(self.im.ajustes().aprendizaje)
+
+    def test_radial_automatico(self):
+        from radial import automatico
+        contexto = {"valor": ("UV Editing", "objeto")}
+        with mock.patch.object(automatico, "contexto_maya", lambda: contexto["valor"]):
+            self.im.mostrar()
+            self.assertEqual(self.im.biblioteca().origen, "pre:1_modelado")  # desactivado de serie
+            self.im.cambiar_opcion("automatico", True)
+            self.assertEqual(self.im.biblioteca().origen, "pre:2_uv_texturas")
+            self.assertTrue(self.im._estado["reloj_automatico"].isActive())
+            # Elegido a mano: se respeta mientras no cambie el contexto.
+            self.im.usar_radial("pre:3_animacion")
+            self.im._tic_automatico()
+            self.assertEqual(self.im.biblioteca().origen, "pre:3_animacion")
+            # Con cambios sin guardar no se cambia.
+            radial = self.im.radial_activo()
+            radial["botones"][0]["texto"] = "X"
+            self.im.modificar_radial(radial)
+            contexto["valor"] = ("Rendering", "objeto")
+            self.im._tic_automatico()
+            self.assertEqual(self.im.biblioteca().origen, "pre:3_animacion")
+            self.im.biblioteca().restaurar()
+            contexto["valor"] = ("Modeling - Standard", "objeto")
+            self.im._tic_automatico()
+            self.assertEqual(self.im.biblioteca().origen, "pre:1_modelado")
+            self.assertEqual(self.im._menu_flotante(crear=False).anuncio, "Modelado")
+
+    def test_modo_clase(self):
+        clase = os.path.join(self.tmp.name, "clase")
+        os.makedirs(clase)
+        self.im.cambiar_opcion("carpeta_clase", clase)
+        self.im.biblioteca().exportar(os.path.join(clase, "examen"), bloqueado=True)
+        self.im.usar_radial("clase:examen")
+        self.im._al_soltar(0, {"texto": "Extrude", "tipo": "comando", "accion": "PolyExtrude"})
+        self.assertNotEqual(self.im.radial_activo()["botones"][0].get("accion"), "PolyExtrude")
+        self.im._llenar_radiales()
+        etiquetas = [c.kwargs.get("label") for c in self.cmds.menuItem.call_args_list]
+        self.assertTrue(any(e and e.endswith("Modelado") and e.startswith("\U0001F512") for e in etiquetas))
+        configurador = self.im.abrir_configurador()
+        self.assertFalse(configurador.texto.isEnabled())
+
+    def test_tarjeta_de_aprendizaje(self):
+        self.im.mostrar()
+        menu = self.im._menu_flotante(crear=False)
+        self.im._buscador()._acciones = []
+        self.im._al_sobre(menu.botones_visibles()[0])
+        tarjeta = self.im._estado["tarjeta"]
+        self.assertIsNotNone(tarjeta.datos)
+        self.im._al_sobre(None)
+        self.assertIsNone(tarjeta.datos)
+        self.im.cambiar_opcion("aprendizaje", False)
+        self.im._al_sobre(menu.botones_visibles()[0])
+        self.assertIsNone(tarjeta.datos)
 
     def test_volver_a_centrar(self):
         self.im._al_mover(QtCore.QPoint(10, 10))

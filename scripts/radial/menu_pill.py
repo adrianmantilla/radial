@@ -11,7 +11,8 @@ from radial import radiales as rd
 from radial.dibujo import (COLOR_ABIERTO, COLOR_AGARRE, COLOR_AGARRE_SOBRE, COLOR_BORDE_FONDO,
                            COLOR_DETALLE, COLOR_FONDO, COLOR_ICONO_CLARO, COLOR_LINEA, COLOR_TEXTO,
                            mezclar, pixmap_icono)
-from radial.arrastre import SoltarBoton
+from radial.menu_comun import (MenuComun, dibujar_encendido, dibujar_flecha_volver,
+                                 dibujar_insignia_opciones, dibujar_marca_carpeta)
 from radial.qt import QtCore, QtGui, QtWidgets, posicion_global, posicion_local
 
 Qt = QtCore.Qt
@@ -71,7 +72,7 @@ class EtiquetaPill(QtWidgets.QWidget):
         pintor.end()
 
 
-class MenuPill(SoltarBoton, QtWidgets.QWidget):
+class MenuPill(MenuComun, QtWidgets.QWidget):
     def __init__(self, padre=None, al_ejecutar=None, al_mover=None, al_configurar=None, vertical=False):
         super(MenuPill, self).__init__(padre)
         _ventana_flotante(self)
@@ -91,6 +92,8 @@ class MenuPill(SoltarBoton, QtWidgets.QWidget):
         self._pulsado = None
         self._arrastre = None
         self._cache = {}
+        self._inicio_clic = None
+        self._iniciar_comun()
         self.etiqueta = EtiquetaPill(padre)
 
         self._reloj = QtCore.QTimer(self)
@@ -134,11 +137,32 @@ class MenuPill(SoltarBoton, QtWidgets.QWidget):
 
     # --- Etiqueta -------------------------------------------------------------
 
+    def anunciar(self, texto):
+        super(MenuPill, self).anunciar(texto)
+        self._colocar_etiqueta()
+
+    def _quitar_anuncio(self):
+        super(MenuPill, self)._quitar_anuncio()
+        self._colocar_etiqueta()
+
     def _colocar_etiqueta(self):
+        rotulo = self.anuncio or (self.boton_carpeta()["texto"] if self.carpeta is not None else "")
+        if not isinstance(self._sobre, int) and rotulo and self.isVisible():
+            self.etiqueta.fijar(rotulo, "")
+            centro = self.mapToGlobal(QtCore.QPoint(self.width() // 2, self.height() // 2))
+            if self.vertical:
+                self.etiqueta.move(self.mapToGlobal(QtCore.QPoint(self.width(), 0)).x() + 8,
+                                   centro.y() - self.etiqueta.height() // 2)
+            else:
+                self.etiqueta.move(centro.x() - self.etiqueta.width() // 2,
+                                   self.mapToGlobal(QtCore.QPoint(0, 0)).y() - self.etiqueta.height() - 8)
+            self.etiqueta.show()
+            self.etiqueta.raise_()
+            return
         if not isinstance(self._sobre, int):
             self.etiqueta.hide()
             return
-        boton = self.radial["botones"][self._sobre]
+        boton = self.botones_visibles()[self._sobre]
         if boton["tipo"] == "vacio" or not self.isVisible():
             self.etiqueta.hide()
             return
@@ -163,11 +187,12 @@ class MenuPill(SoltarBoton, QtWidgets.QWidget):
         self._sobre = sobre
         if sobre == "centro":
             self.setCursor(Qt.OpenHandCursor)
-        elif isinstance(sobre, int) and self.radial["botones"][sobre]["tipo"] != "vacio":
+        elif isinstance(sobre, int) and self.botones_visibles()[sobre]["tipo"] != "vacio":
             self.setCursor(Qt.PointingHandCursor)
         else:
             self.unsetCursor()
         self._colocar_etiqueta()
+        self._seguir_mayus()
         if not self._reloj.isActive():
             self._reloj.start()
         self.update()
@@ -185,6 +210,7 @@ class MenuPill(SoltarBoton, QtWidgets.QWidget):
     def mousePressEvent(self, evento):
         sobre = self._que_hay(posicion_local(evento))
         if sobre == "centro" and evento.button() == Qt.LeftButton:
+            self._inicio_clic = posicion_global(evento)
             self._arrastre = posicion_global(evento) - self.pos()
             self.setCursor(Qt.ClosedHandCursor)
         elif sobre == "centro" and evento.button() == Qt.RightButton:
@@ -198,20 +224,27 @@ class MenuPill(SoltarBoton, QtWidgets.QWidget):
         if self._arrastre is not None and evento.button() == Qt.LeftButton:
             self._arrastre = None
             self.setCursor(Qt.OpenHandCursor)
-            if self._al_mover:
+            quieto = (self._inicio_clic is not None
+                      and (posicion_global(evento) - self._inicio_clic).manhattanLength() < 4)
+            if quieto and self.carpeta is not None:
+                self.cerrar_carpeta()  # clic en el agarre dentro de una carpeta: volver
+            elif not quieto and self._al_mover:
                 self._al_mover(self.centro_global())
             return
         sobre = self._que_hay(posicion_local(evento))
         pulsado, self._pulsado = self._pulsado, None
-        if (evento.button() == Qt.LeftButton and isinstance(sobre, int) and sobre == pulsado
-                and self.radial["botones"][sobre]["tipo"] != "vacio" and self._al_ejecutar):
-            self._al_ejecutar(sobre)
+        if evento.button() == Qt.LeftButton and isinstance(sobre, int) and sobre == pulsado:
+            self._pulsar(sobre, evento.modifiers())
 
     def moveEvent(self, evento):
         self._colocar_etiqueta()
         super(MenuPill, self).moveEvent(evento)
 
     def hideEvent(self, evento):
+        if self.al_sobre is not None:
+            self.al_sobre(None)
+        self.carpeta = None
+        self._reloj_mayus.stop()
         self._arrastre = None
         self._pulsado = None
         self._sobre = None
@@ -229,7 +262,7 @@ class MenuPill(SoltarBoton, QtWidgets.QWidget):
     def _animar(self):
         quietos = True
         for i in range(rd.NUM_BOTONES):
-            vacio = self.radial["botones"][i]["tipo"] == "vacio"
+            vacio = self.botones_visibles()[i]["tipo"] == "vacio"
             objetivo = 1.0 if (self._sobre == i and (not vacio or self._soltando)) else 0.0
             actual = self._apertura[i]
             if abs(objetivo - actual) > 1e-3:
@@ -267,11 +300,15 @@ class MenuPill(SoltarBoton, QtWidgets.QWidget):
         ax, ay, aw, ah = agarre
         cx, cy = ax + aw / 2.0, ay + ah / 2.0
         pintor.setPen(Qt.NoPen)
-        pintor.setBrush(COLOR_AGARRE_SOBRE if self._sobre == "centro" else COLOR_AGARRE)
-        for a in (-2.8, 2.8):
-            for b in (-4.0, 0.0, 4.0):
-                px, py = (cx + b, cy + a) if self.vertical else (cx + a, cy + b)
-                pintor.drawEllipse(QtCore.QPointF(px, py), 1.3, 1.3)
+        color_agarre = COLOR_AGARRE_SOBRE if self._sobre == "centro" else COLOR_AGARRE
+        if self.carpeta is not None:
+            dibujar_flecha_volver(pintor, QtCore.QPointF(cx - 0.5, cy), color_agarre)
+        else:
+            pintor.setBrush(color_agarre)
+            for a in (-2.8, 2.8):
+                for b in (-4.0, 0.0, 4.0):
+                    px, py = (cx + b, cy + a) if self.vertical else (cx + a, cy + b)
+                    pintor.drawEllipse(QtCore.QPointF(px, py), 1.3, 1.3)
         pintor.setPen(QtGui.QPen(COLOR_LINEA, 1.0))
         raya = rd.PILL_MARGEN + rd.PILL_AGARRE + rd.PILL_RAYA / 2.0
         mitad = ap["pill_boton"] * 0.28
@@ -283,7 +320,7 @@ class MenuPill(SoltarBoton, QtWidgets.QWidget):
         # Botones
         lado_icono = round(ap["pill_boton"] * 0.56)
         for i, (bx, by, bw, bh) in enumerate(botones):
-            boton = self.radial["botones"][i]
+            boton = self.botones_visibles()[i]
             a = self._apertura[i]
             centro = QtCore.QPointF(bx + bw / 2.0, by + bh / 2.0)
             if a > 0:
@@ -296,14 +333,21 @@ class MenuPill(SoltarBoton, QtWidgets.QWidget):
             base = ap["opacidad"] * (0.45 if boton["tipo"] == "vacio" else 1.0)
             if claro is None:
                 self._inicial(pintor, boton, rect, a, base)
-                continue
-            if a < 1:
-                pintor.setOpacity(base * (1 - a))
-                pintor.drawPixmap(rect, claro, QtCore.QRectF(claro.rect()))
-            if a > 0:
-                pintor.setOpacity(base * a)
-                pintor.drawPixmap(rect, oscuro, QtCore.QRectF(oscuro.rect()))
+            else:
+                if a < 1:
+                    pintor.setOpacity(base * (1 - a))
+                    pintor.drawPixmap(rect, claro, QtCore.QRectF(claro.rect()))
+                if a > 0:
+                    pintor.setOpacity(base * a)
+                    pintor.drawPixmap(rect, oscuro, QtCore.QRectF(oscuro.rect()))
             pintor.setOpacity(ap["opacidad"])
+            abajo = QtCore.QPointF(centro.x(), centro.y() + bh / 2.0 - 4)
+            if self.estados[i] is True:
+                dibujar_encendido(pintor, abajo, 2.0)
+            elif boton["tipo"] == "carpeta":
+                dibujar_marca_carpeta(pintor, abajo, mezclar(QtGui.QColor(236, 236, 236), QtGui.QColor(40, 40, 40), a))
+            if self._muestra_opciones(i):
+                dibujar_insignia_opciones(pintor, QtCore.QPointF(centro.x() + bw * 0.36, centro.y() + bh * 0.36), 8)
         pintor.end()
 
     def _inicial(self, pintor, boton, rect, a, base):

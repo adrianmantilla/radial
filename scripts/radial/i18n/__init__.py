@@ -41,3 +41,24 @@ def t(clave, **valores):
         return texto.format(**valores)
     except (KeyError, IndexError):
         return texto
+
+
+_sinonimos = {}
+
+
+def sinonimos(idioma=None):
+    """Nombres y ayudas de las órdenes de Maya en el idioma activo.
+
+    ``{"PolyExtrude": {"es": "Extruir", "ayuda": "Saca caras..."}}``. Están en
+    ``sinonimos_<idioma>.json``; se pueden añadir más órdenes sin tocar código.
+    """
+    idioma = idioma or _idioma
+    if idioma not in _sinonimos:
+        ruta = os.path.join(_CARPETA, "sinonimos_{}.json".format(idioma))
+        try:
+            with open(ruta, encoding="utf-8") as f:
+                datos = json.load(f)
+        except (OSError, ValueError):
+            datos = {}
+        _sinonimos[idioma] = {k: v for k, v in datos.items() if isinstance(v, dict)}
+    return _sinonimos[idioma]

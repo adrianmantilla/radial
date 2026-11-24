@@ -28,6 +28,26 @@ class FuentesMaya(object):
             self._comandos = resultado
         return self._comandos
 
+    def atajos(self):
+        """``{comando: "Ctrl+E"}`` con los atajos de teclado del juego de atajos actual."""
+        resultado = {}
+        try:
+            total = cmds.assignCommand(query=True, numElements=True) or 0
+        except RuntimeError:
+            return resultado
+        for i in range(1, total + 1):
+            try:
+                nombre = cmds.assignCommand(i, query=True, name=True) or ""
+                tecla = cmds.assignCommand(i, query=True, keyString=True)
+            except RuntimeError:
+                continue
+            texto = _texto_atajo(tecla)
+            if not texto or not nombre:
+                continue
+            comando = nombre[:-len("NameCommand")] if nombre.endswith("NameCommand") else nombre
+            resultado.setdefault(comando, texto)
+        return resultado
+
     def estantes(self):
         """Lista de (nombre del estante, [botones]) con cada botón como diccionario de radial."""
         try:
@@ -75,3 +95,26 @@ class FuentesMaya(object):
     def probar(self, boton):
         from radial import acciones
         return acciones.ejecutar(boton)
+
+
+def _texto_atajo(tecla):
+    """``["e", "0", "1", "0", "0"]`` (tecla, alt, ctrl, al soltar, cmd) -> ``"Ctrl+E"``."""
+    if isinstance(tecla, str):
+        tecla = [tecla]
+    if not tecla or not tecla[0] or tecla[0] == "NONE":
+        return ""
+    banderas = list(tecla[1:]) + ["0"] * 4
+    if banderas[2] in ("1", 1, True):  # se lanza al soltar la tecla: no es un atajo normal
+        return ""
+    partes = []
+    if banderas[1] in ("1", 1, True):
+        partes.append("Ctrl")
+    if banderas[0] in ("1", 1, True):
+        partes.append("Alt")
+    if banderas[3] in ("1", 1, True):
+        partes.append("Cmd")
+    letra = tecla[0]
+    if len(letra) == 1 and letra.isupper():
+        partes.append("Mayús")
+    partes.append(letra.upper() if len(letra) == 1 else letra)
+    return "+".join(partes)

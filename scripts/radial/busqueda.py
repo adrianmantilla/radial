@@ -6,6 +6,8 @@ Una acción es un diccionario con:
 - ``nombre``: el comando de Maya o el origen («CenterPivot»).
 - ``categoria``: dónde está en Maya («Modify», «Estante Poly»).
 - ``descripcion``: la ayuda del comando (también se busca en ella).
+- ``traduccion``: su nombre en el idioma del alumno («Centrar pivote»), o "".
+- ``atajo``: su atajo de teclado («Ctrl+E»), o "".
 - ``boton``: el botón de radial que se ejecuta.
 """
 
@@ -37,12 +39,15 @@ def categoria_legible(categoria):
     return " › ".join(partes)
 
 
-def accion_de_comando(nombre, categoria="", descripcion=""):
+def accion_de_comando(nombre, categoria="", descripcion="", traduccion="", ayuda="", atajo=""):
+    """``ayuda`` (en el idioma del alumno) sustituye a la descripción en inglés de Maya."""
     return {
         "texto": texto_de_comando(nombre),
         "nombre": nombre,
         "categoria": categoria_legible(categoria),
-        "descripcion": descripcion or "",
+        "descripcion": ayuda or descripcion or "",
+        "traduccion": traduccion or "",
+        "atajo": atajo or "",
         "boton": {"texto": texto_de_comando(nombre)[:40], "detalle": "", "icono": "", "tipo": "comando",
                   "accion": nombre},
     }
@@ -54,6 +59,8 @@ def accion_de_estante(estante, boton):
         "nombre": estante,
         "categoria": estante,
         "descripcion": boton.get("descripcion", ""),
+        "traduccion": "",
+        "atajo": "",
         "boton": {k: boton.get(k, "") for k in ("texto", "detalle", "icono", "tipo", "accion")},
     }
 
@@ -66,17 +73,17 @@ def clave(accion):
 
 def _puntos(accion, palabras):
     """Menos es mejor. None si alguna palabra no está."""
-    texto = sin_acentos(accion["texto"])
+    nombres = [sin_acentos(accion["texto"]), sin_acentos(accion.get("traduccion", ""))]
     nombre = sin_acentos(accion["nombre"])
     resto = sin_acentos(accion["categoria"] + " " + accion["descripcion"])
-    palabras_texto = texto.split()
+    palabras_nombres = [p for n in nombres for p in n.split()]
     total = 0
     for palabra in palabras:
-        if texto.startswith(palabra):
+        if any(n.startswith(palabra) for n in nombres if n):
             total += 0
-        elif any(p.startswith(palabra) for p in palabras_texto):
+        elif any(p.startswith(palabra) for p in palabras_nombres):
             total += 1
-        elif palabra in texto or palabra in nombre:
+        elif any(palabra in n for n in nombres) or palabra in nombre:
             total += 3
         elif palabra in resto:
             total += 6
@@ -116,7 +123,8 @@ def anadir_reciente(recientes, accion, limite=MAX_RECIENTES):
     """Pone ``accion`` la primera de ``recientes`` (lista de acciones) sin repetirla."""
     k = clave(accion)
     resto = [a for a in recientes if isinstance(a, dict) and "boton" in a and clave(a) != k]
-    guardada = {c: accion.get(c, "") for c in ("texto", "nombre", "categoria", "descripcion")}
+    guardada = {c: accion.get(c, "") for c in ("texto", "nombre", "categoria", "descripcion", "traduccion",
+                                                 "atajo")}
     guardada["boton"] = dict(accion["boton"])
     return [guardada] + resto[:limite - 1]
 

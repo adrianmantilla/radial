@@ -13,7 +13,7 @@ Cada botón lanza la orden de Maya que tú elijas.
 - Se guarda, se exporta y se comparte como un archivo `.radial`.
 - No cambia ningún atajo de Maya.
 
-No necesita instalar nada más: funciona con el Python que trae Maya. Versión **1.0.0**.
+No necesita instalar nada más: funciona con el Python que trae Maya. Versión **1.1.0**.
 
 > *English summary:* Radial is a floating six-button menu for Maya 2026/2027 (Windows and macOS). Hover a
 > viewport and press **Tab twice quickly** to show or hide it. Buttons can run any Maya command, a shelf
@@ -68,10 +68,48 @@ Debajo del radial y de la pill hay una barra **Buscar acción…**. Haz clic en 
 nombre del comando. Las palabras pueden ir en cualquier orden («uv editor» o «editor uv») y no importan
 las tildes ni las mayúsculas. Antes de escribir enseña las últimas que has usado.
 
-- **↑ ↓** para elegir, **Intro** o clic para ejecutar. **Esc** borra y devuelve el teclado a Maya.
+También entiende español: «centrar pivote», «biselar» o «congelar» encuentran `CenterPivot`, `BevelPolygon`
+y `FreezeTransformations`. Cada resultado enseña el nombre de Maya en inglés (el de los menús y los
+tutoriales) con el nombre en español debajo, y a la derecha su atajo de teclado si tiene.
+
+- **↑ ↓** para elegir, **Intro** o clic para ejecutar. Con **Mayús** (Mayús + Intro o Mayús + clic) se
+  abre su ventana de opciones. **Esc** borra y devuelve el teclado a Maya.
 - Mientras escribes, Maya no recibe tus teclas, así que no se dispara ningún atajo.
 - **Arrastra un resultado hasta un botón** del menú para ponerlo en ese botón (luego guarda el radial).
 - Se oculta en **Radial > Ajustes > Buscador**.
+
+## Mayús + clic: opciones
+
+Con **Mayús** pulsada, los botones que tienen ventana de opciones (el ☐ de los menús de Maya) muestran
+una marca. **Mayús + clic** abre esa ventana en lugar de ejecutar la orden directamente.
+
+## Interruptores
+
+Un botón puede ser un **interruptor**: enciende o apaga algo y se ilumina en verde mientras está
+encendido. Vienen preparados Malla (wireframe), Rayos X, Aislar selección, Suavizado, Imán a la rejilla,
+Imán a vértices, Rejilla y Simetría. En **Código Python** puedes hacer los tuyos rellenando
+**Encendido si** con una línea que devuelva True o False, por ejemplo `cmds.snapMode(q=True, grid=True)`.
+
+## Opciones (Radial > Ajustes)
+
+| Opción | De serie | Qué hace |
+| --- | --- | --- |
+| Buscador | Activado | La barra de búsqueda bajo el menú |
+| Modo aprendizaje | Activado | Al pasar por un botón, una tarjeta al lado del menú explica qué hace, su nombre en Maya, su atajo y si tiene opciones |
+| Carpetas | Desactivado | Permite que un botón sea una **carpeta** con otros seis botones. En el menú, al pulsarla se ven sus botones; un clic en el centro (o en el agarre de la pill) vuelve |
+| Radial automático | Desactivado | Cambia de radial solo según el workspace de Maya (Modeling, UV Editing, Animation, Rendering...) y el modo de selección (objeto, vértices, aristas, caras, UV). El modo de selección manda. Se configura en **Reglas…**. Si eliges otro radial a mano se respeta hasta que cambies de workspace o de modo, y nunca cambia si hay cambios sin guardar |
+| Carpeta de clase | Ninguna | Ver abajo |
+
+## Modo clase
+
+El profesor elige una carpeta compartida (red del aula, Drive, Dropbox...) como **Carpeta de clase**, y
+los alumnos la misma en sus Ajustes (o con la variable de entorno `RADIAL_CLASE=<carpeta>`). Los radiales
+de esa carpeta salen en **Radial > Radiales > De clase**. Si el profesor cambia uno, a los alumnos se les
+actualiza la próxima vez que abren el menú.
+
+**Radiales > Exportar bloqueado para clase…** guarda el radial activo **bloqueado** (🔒): los alumnos lo
+usan pero no pueden cambiarlo. Si quieren tocarlo, **Guardar como copia mía** crea un radial suyo sin
+bloquear.
 
 ## Configurar los botones
 
@@ -88,7 +126,9 @@ Para cada botón eliges:
 | --- | --- |
 | Comando de Maya | Cualquiera de los comandos del Editor de atajos, con buscador (casi todo lo que hay en los menús) |
 | Botón del estante | Copia la orden, el icono y el texto de un botón de cualquier estante |
+| Interruptor | Enciende o apaga algo y se ilumina en verde mientras está encendido |
 | Código Python / MEL | Tus propias líneas. Se deshacen de una vez con Ctrl+Z |
+| Carpeta | Otros seis botones dentro (solo con **Carpetas** activado en Ajustes). **Abrir carpeta** para editarlos |
 | Vacío | No hace nada; el botón se ve atenuado |
 
 **Probar este botón** lo ejecuta sin cerrar la ventana. Los cambios se ven en el menú al momento y se
@@ -135,7 +175,9 @@ JSON con el nombre, los seis botones y la apariencia:
 }
 ```
 
-`tipo` es `comando`, `python`, `mel` o `vacio`. Si faltan botones se rellenan vacíos, y los valores
+`tipo` es `comando`, `python`, `mel`, `carpeta` o `vacio`. Un botón puede llevar `estado`
+(`"radial:<interruptor>"` o una línea de Python que devuelve True o False); una carpeta lleva sus seis
+botones en `botones` (sin carpetas dentro). Un radial con `"bloqueado": true` no se puede editar. Si faltan botones se rellenan vacíos, y los valores
 fuera de rango se ajustan al cargar.
 
 ## Para desarrollar

@@ -172,6 +172,7 @@ class ListaResultados(QtWidgets.QWidget):
             return
 
         ancho_texto = self.width() - 2 * MARGEN - 46
+        metrica = QtGui.QFontMetrics(pequena)
         for i, accion in enumerate(self.acciones):
             y = self._y0() + i * ALTO_FILA
             fila = QtCore.QRectF(MARGEN, y, self.width() - 2 * MARGEN, ALTO_FILA)
@@ -194,14 +195,23 @@ class ListaResultados(QtWidgets.QWidget):
             # Texto con lo buscado en negrita
             x = fila.left() + 40
             pintor.setPen(COLOR_TEXTO_ELEGIDO if elegida else COLOR_TEXTO)
-            texto = QtGui.QFontMetrics(fuente).elidedText(accion["texto"], Qt.ElideRight, int(ancho_texto))
+            hueco = ancho_texto - (metrica.horizontalAdvance(accion.get("atajo", "")) + 12 if accion.get("atajo") else 0)
+            texto = QtGui.QFontMetrics(fuente).elidedText(accion["texto"], Qt.ElideRight, int(hueco))
             for trozo, marca in busqueda.partes_resaltadas(texto, self.consulta):
                 pintor.setFont(negrita if marca else fuente)
                 pintor.drawText(QtCore.QPointF(x, y + 17), trozo)
                 x += QtGui.QFontMetrics(negrita if marca else fuente).horizontalAdvance(trozo)
-            # Debajo: menú de Maya y nombre del comando
-            detalle = " · ".join(p for p in (accion["categoria"], accion["nombre"]
-                                             if accion["nombre"] != accion["categoria"] else "") if p)
+            # Debajo: nombre en español, menú de Maya y nombre del comando
+            detalle = " · ".join(p for p in (accion.get("traduccion", ""), accion["categoria"],
+                                             accion["nombre"] if accion["nombre"] != accion["categoria"] else "")
+                                 if p)
+            # A la derecha: el atajo, si tiene
+            atajo = accion.get("atajo", "")
+            if atajo:
+                pintor.setFont(pequena)
+                pintor.setPen(COLOR_DETALLE_ELEGIDO if elegida else COLOR_PISTA)
+                pintor.drawText(QtCore.QRectF(fila.left(), y, fila.width() - 10, 26),
+                                Qt.AlignRight | Qt.AlignVCenter, atajo)
             pintor.setFont(pequena)
             pintor.setPen(COLOR_DETALLE_ELEGIDO if elegida else COLOR_DETALLE)
             detalle = QtGui.QFontMetrics(pequena).elidedText(detalle, Qt.ElideRight, int(ancho_texto))
@@ -225,7 +235,7 @@ class Buscador(QtWidgets.QWidget):
     """La barra de búsqueda. Avisa con:
 
     - ``acciones()``: lista de acciones (ver ``busqueda``); se pide la primera vez.
-    - ``al_ejecutar(accion)``: se eligió una acción.
+    - ``al_ejecutar(accion, opciones=False)``: se eligió una acción (con Mayúsculas, ``opciones``).
     - ``recientes()``: las usadas hace poco.
     - ``al_terminar()``: se ejecutó o se pulsó Esc; devuelve el teclado a Maya.
     """
@@ -373,7 +383,7 @@ class Buscador(QtWidgets.QWidget):
         if tecla in (Qt.Key_Return, Qt.Key_Enter):
             accion = self.lista.accion_elegida() if self.lista.isVisible() else None
             if accion is not None:
-                self.ejecutar(accion)
+                self.ejecutar(accion, bool(evento.modifiers() & Qt.ShiftModifier))
             return True
         if tecla == Qt.Key_Escape:
             self.terminar()
@@ -419,9 +429,15 @@ class Buscador(QtWidgets.QWidget):
         if sigue_vivo(self.lista):
             self.lista.hide()
 
-    def ejecutar(self, accion):
+    def ejecutar(self, accion, opciones=None):
+        """Lanza ``accion``. Con Mayúsculas (``opciones``) abre su ventana de opciones."""
+        if opciones is None:
+            opciones = bool(QtWidgets.QApplication.keyboardModifiers() & Qt.ShiftModifier)
         self.terminar()
-        self._al_ejecutar(accion)
+        if opciones:
+            self._al_ejecutar(accion, opciones=True)
+        else:
+            self._al_ejecutar(accion)
 
     def terminar(self):
         """Borra el texto, cierra el desplegable y devuelve el teclado a Maya."""

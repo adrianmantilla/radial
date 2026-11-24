@@ -14,7 +14,8 @@ from radial import radiales as rd
 from radial.dibujo import (COLOR_ABIERTO, COLOR_AGARRE, COLOR_AGARRE_SOBRE, COLOR_BORDE, COLOR_CENTRO,
                            COLOR_DETALLE, COLOR_LINEA, COLOR_PUNTO, COLOR_TEXTO, dibujar_icono_boton,
                            dibujar_texto, mezclar)
-from radial.arrastre import SoltarBoton
+from radial.menu_comun import (COLOR_ENCENDIDO, MenuComun, dibujar_encendido, dibujar_flecha_volver,
+                                 dibujar_insignia_opciones, dibujar_marca_carpeta)
 from radial.qt import QtCore, QtGui, QtWidgets, posicion_global, posicion_local
 
 Qt = QtCore.Qt
@@ -22,10 +23,10 @@ Qt = QtCore.Qt
 _PASO_ANIMACION = 0.22
 
 
-class MenuRadial(SoltarBoton, QtWidgets.QWidget):
+class MenuRadial(MenuComun, QtWidgets.QWidget):
     """Menú radial. Avisa con tres funciones que le pasa quien lo crea:
 
-    - ``al_ejecutar(indice)``: clic en un botón.
+    - ``al_ejecutar(indice, opciones=False)``: clic en un botón (``opciones`` con Mayúsculas).
     - ``al_mover(centro)``: se soltó tras arrastrarlo (centro en pantalla, QPoint).
     - ``al_configurar()``: clic derecho en el centro.
     """
@@ -52,6 +53,8 @@ class MenuRadial(SoltarBoton, QtWidgets.QWidget):
         self._pulsado = None        # botón donde empezó el clic
         self._arrastre = None       # desplazamiento ratón - esquina durante el arrastre
         self._cache_iconos = {}
+        self._inicio_clic = None
+        self._iniciar_comun()
 
         self._reloj = QtCore.QTimer(self)
         self._reloj.setInterval(16)
@@ -122,10 +125,11 @@ class MenuRadial(SoltarBoton, QtWidgets.QWidget):
         self._sobre = sobre
         if sobre == "centro":
             self.setCursor(Qt.OpenHandCursor)
-        elif isinstance(sobre, int) and self.radial["botones"][sobre]["tipo"] != "vacio":
+        elif isinstance(sobre, int) and self.botones_visibles()[sobre]["tipo"] != "vacio":
             self.setCursor(Qt.PointingHandCursor)
         else:
             self.unsetCursor()
+        self._seguir_mayus()
         if not self._reloj.isActive():
             self._reloj.start()
         self.update()
@@ -143,6 +147,7 @@ class MenuRadial(SoltarBoton, QtWidgets.QWidget):
     def mousePressEvent(self, evento):
         sobre = rd.que_hay_en(*self._local(posicion_local(evento)), apariencia=self.apariencia)
         if sobre == "centro" and evento.button() == Qt.LeftButton:
+            self._inicio_clic = posicion_global(evento)
             self._arrastre = posicion_global(evento) - self.pos()
             self.setCursor(Qt.ClosedHandCursor)
         elif sobre == "centro" and evento.button() == Qt.RightButton:
@@ -156,16 +161,23 @@ class MenuRadial(SoltarBoton, QtWidgets.QWidget):
         if self._arrastre is not None and evento.button() == Qt.LeftButton:
             self._arrastre = None
             self.setCursor(Qt.OpenHandCursor)
-            if self._al_mover:
+            quieto = (self._inicio_clic is not None
+                      and (posicion_global(evento) - self._inicio_clic).manhattanLength() < 4)
+            if quieto and self.carpeta is not None:
+                self.cerrar_carpeta()  # clic en el centro dentro de una carpeta: volver
+            elif not quieto and self._al_mover:
                 self._al_mover(self.centro_global())
             return
         sobre = rd.que_hay_en(*self._local(posicion_local(evento)), apariencia=self.apariencia)
         pulsado, self._pulsado = self._pulsado, None
-        if (evento.button() == Qt.LeftButton and isinstance(sobre, int) and sobre == pulsado
-                and self.radial["botones"][sobre]["tipo"] != "vacio" and self._al_ejecutar):
-            self._al_ejecutar(sobre)
+        if evento.button() == Qt.LeftButton and isinstance(sobre, int) and sobre == pulsado:
+            self._pulsar(sobre, evento.modifiers())
 
     def hideEvent(self, evento):
+        if self.al_sobre is not None:
+            self.al_sobre(None)
+        self.carpeta = None
+        self._reloj_mayus.stop()
         self._arrastre = None
         self._pulsado = None
         self._sobre = None
@@ -178,7 +190,7 @@ class MenuRadial(SoltarBoton, QtWidgets.QWidget):
     def _animar(self):
         quietos = True
         for i in range(rd.NUM_BOTONES):
-            vacio = self.radial["botones"][i]["tipo"] == "vacio"
+            vacio = self.botones_visibles()[i]["tipo"] == "vacio"
             objetivo = 1.0 if (self._sobre == i and (not vacio or self._soltando)) else 0.0
             actual = self._apertura[i]
             if abs(objetivo - actual) > 1e-3:
@@ -210,17 +222,22 @@ class MenuRadial(SoltarBoton, QtWidgets.QWidget):
         pintor.setPen(Qt.NoPen)
         pintor.setBrush(COLOR_CENTRO)
         pintor.drawEllipse(QtCore.QPointF(0, 0), rd.RADIO_CENTRO, rd.RADIO_CENTRO)
-        pintor.setBrush(COLOR_AGARRE_SOBRE if self._sobre == "centro" else COLOR_AGARRE)
-        for x in (-2.8, 2.8):
-            for y in (-4.0, 0.0, 4.0):
-                pintor.drawEllipse(QtCore.QPointF(x, y), 1.3, 1.3)
+        color_agarre = COLOR_AGARRE_SOBRE if self._sobre == "centro" else COLOR_AGARRE
+        if self.carpeta is not None:
+            dibujar_flecha_volver(pintor, QtCore.QPointF(-0.5, 0), color_agarre)
+        else:
+            pintor.setBrush(color_agarre)
+            for x in (-2.8, 2.8):
+                for y in (-4.0, 0.0, 4.0):
+                    pintor.drawEllipse(QtCore.QPointF(x, y), 1.3, 1.3)
 
         # Botones
         for i, (x, y) in enumerate(rd.posiciones(ap["radio"])):
-            boton = self.radial["botones"][i]
+            boton = self.botones_visibles()[i]
             a = self._apertura[i]
             r = ap["punto"] + (ap["abierto"] - ap["punto"]) * a
-            pintor.setBrush(mezclar(COLOR_PUNTO, COLOR_ABIERTO, a))
+            encendido = self.estados[i] is True
+            pintor.setBrush(mezclar(COLOR_ENCENDIDO if encendido else COLOR_PUNTO, COLOR_ABIERTO, a))
             borde = mezclar(COLOR_BORDE, COLOR_ABIERTO, a)
             if boton["tipo"] == "vacio":
                 borde.setAlpha(borde.alpha() // 2)
@@ -229,10 +246,24 @@ class MenuRadial(SoltarBoton, QtWidgets.QWidget):
             if a > 0.05:
                 dibujar_icono_boton(pintor, boton, (x, y), r, ap["opacidad"] * a, self._cache_iconos,
                                     self.devicePixelRatioF())
+            if a > 0.6:
+                abajo = QtCore.QPointF(x, y + r - 4.5)
+                if encendido:
+                    dibujar_encendido(pintor, abajo)
+                elif boton["tipo"] == "carpeta":
+                    dibujar_marca_carpeta(pintor, abajo, QtGui.QColor(40, 40, 40))
+                if self._muestra_opciones(i):
+                    dibujar_insignia_opciones(pintor, QtCore.QPointF(x + r * 0.72, y + r * 0.72))
 
-        # Nombre del botón bajo el ratón
+        # Nombre del botón bajo el ratón (o de la carpeta abierta)
+        rotulo = self.anuncio or (self.boton_carpeta()["texto"] if self.carpeta is not None else "")
+        if rotulo and not isinstance(self._sobre, int):
+            y_texto, _ = self._lineas_texto_y()
+            ancho = max(80.0, 2 * (ap["radio"] - ap["abierto"]) - 4)
+            dibujar_texto(pintor, rotulo, QtCore.QRectF(-ancho / 2, y_texto - 10, ancho, 20),
+                          COLOR_TEXTO if self.anuncio else COLOR_DETALLE, negrita=True)
         if isinstance(self._sobre, int):
-            boton = self.radial["botones"][self._sobre]
+            boton = self.botones_visibles()[self._sobre]
             if boton["tipo"] != "vacio":
                 y_texto, y_detalle = self._lineas_texto_y()
                 ancho = max(80.0, 2 * (ap["radio"] - ap["abierto"]) - 4)

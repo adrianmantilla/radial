@@ -23,13 +23,24 @@ Si no se abre, prueba a pulsar más rápido. También puedes usar **Radial > Mos
 
 Debajo del menú tienes el **buscador**: haz clic, escribe lo que buscas (por ejemplo «extrude») y elige
 con las flechas e Intro o con un clic. **Esc** para salir. Si arrastras un resultado hasta un punto del
-menú, ese botón pasa a hacer esa orden.
+menú, ese botón pasa a hacer esa orden. Puedes buscar en español («centrar pivote», «biselar»): verás el
+nombre de Maya en inglés y debajo el español, para que aprendas los dos.
+
+- **Mayús + clic** en un botón (o Mayús + Intro en el buscador) abre la ventana de opciones de esa orden.
+- Los botones que encienden o apagan algo (Rayos X, Malla, Imán...) se ven **en verde** mientras están
+  encendidos.
+- Al pasar el ratón por un botón, una **tarjeta** al lado te explica qué hace y su atajo de teclado.
+  Cuando ya te los sepas, apágala en **Radial > Ajustes > Modo aprendizaje**.
 
 ## 4. Elegir otro juego de botones
 
 **Radial > Radiales** y elige uno: Modelado, UV y texturas, Animación o Render con Arnold.
 
 Si tu profesor te da un archivo **.radial**: **Radial > Radiales > Importar desde archivo**.
+
+Si tu profesor usa una **carpeta de clase**, elígela en **Radial > Ajustes > Carpeta de clase**. Sus
+radiales salen en **Radial > Radiales > De clase**. Los que llevan 🔒 no se pueden cambiar: para tener
+el tuyo, **Configurar botones > Guardar como copia mía**.
 
 ## 5. Cambiar los botones
 
@@ -44,6 +55,9 @@ Clic derecho en el centro del menú (o **Radial > Configurar botones**).
 
 **Radial > Ajustes**: radio del anillo, tamaño de los puntos, opacidad y velocidad del doble Tab.
 En **Forma** puedes cambiar el anillo por una **pill** (una barra con los botones en fila).
+
+En **Opciones** puedes activar las **Carpetas** (un botón que guarda otros seis) y el **Radial
+automático** (cambia solo de radial cuando pasas de modelar a UV, animación o render).
 
 ## Si algo va mal
 

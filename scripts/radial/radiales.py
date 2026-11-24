@@ -15,7 +15,13 @@ Un archivo ``.radial`` tiene esta forma::
     }
 
 ``tipo`` puede ser ``comando`` (comando de Maya, el mismo nombre que usa el
-Editor de atajos), ``python``, ``mel`` o ``vacio``. Este módulo no depende de
+Editor de atajos), ``python``, ``mel``, ``carpeta`` o ``vacio``.
+
+Campos opcionales (desde la 1.1):
+
+- En un botón, ``estado``: si está encendido (ver ``interruptores``).
+- En un botón ``carpeta``, ``botones``: sus seis botones (sin más carpetas dentro).
+- En el radial, ``bloqueado``: se usa pero no se edita (radiales de clase). Este módulo no depende de
 Maya; lee, comprueba y calcula la geometría del menú.
 """
 
@@ -28,7 +34,7 @@ import unicodedata
 FORMATO = 1
 NUM_BOTONES = 6
 EXTENSION = ".radial"
-TIPOS = ("comando", "python", "mel", "vacio")
+TIPOS = ("comando", "python", "mel", "carpeta", "vacio")
 CARPETA_PRECONFIGURADOS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "preconfigurados")
 
 # Rango de cada valor de apariencia: (mínimo, máximo, por defecto)
@@ -65,7 +71,7 @@ def normalizar_apariencia(datos):
     return {clave: _limitar(datos.get(clave), *rango) for clave, rango in APARIENCIA.items()}
 
 
-def normalizar_boton(datos):
+def normalizar_boton(datos, carpeta_permitida=True):
     if not isinstance(datos, dict):
         return boton_vacio()
     boton = boton_vacio()
@@ -74,9 +80,25 @@ def normalizar_boton(datos):
         boton[clave] = valor if isinstance(valor, str) else ""
     tipo = datos.get("tipo")
     boton["tipo"] = tipo if tipo in TIPOS else "vacio"
+    if boton["tipo"] == "carpeta":
+        if not carpeta_permitida:
+            return boton_vacio()
+        boton["accion"] = ""
+        boton["botones"] = normalizar_botones(datos.get("botones"), carpeta_permitida=False)
+        return boton
     if boton["tipo"] != "vacio" and not boton["accion"].strip():
         boton["tipo"] = "vacio"
+    estado = datos.get("estado")
+    if boton["tipo"] != "vacio" and isinstance(estado, str) and estado.strip():
+        boton["estado"] = estado.strip()
     return boton
+
+
+def normalizar_botones(lista, carpeta_permitida=True):
+    """Exactamente seis botones válidos."""
+    lista = lista if isinstance(lista, list) else []
+    botones = [normalizar_boton(b, carpeta_permitida) for b in lista[:NUM_BOTONES]]
+    return botones + [boton_vacio() for _ in range(NUM_BOTONES - len(botones))]
 
 
 def normalizar(datos):
@@ -90,15 +112,16 @@ def normalizar(datos):
         raise RadialNoValido("no tiene lista de botones")
     if datos.get("formato", FORMATO) > FORMATO:
         raise RadialNoValido("formato más nuevo que esta versión del plugin")
-    botones = [normalizar_boton(b) for b in datos["botones"][:NUM_BOTONES]]
-    botones += [boton_vacio() for _ in range(NUM_BOTONES - len(botones))]
     nombre = datos.get("nombre")
-    return {
+    radial = {
         "formato": FORMATO,
         "nombre": nombre.strip() if isinstance(nombre, str) and nombre.strip() else "Radial",
-        "botones": botones,
+        "botones": normalizar_botones(datos["botones"]),
         "apariencia": normalizar_apariencia(datos.get("apariencia")),
     }
+    if datos.get("bloqueado") is True:
+        radial["bloqueado"] = True
+    return radial
 
 
 def leer(ruta):
