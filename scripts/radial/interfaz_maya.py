@@ -382,7 +382,8 @@ def _buscador():
     if not sigue_vivo(buscador):
         from radial.buscador import Buscador
         buscador = Buscador(_acciones_buscador, _al_buscar, recientes=lambda: ajustes().recientes,
-                            al_terminar=_devolver_foco, padre=ventana_maya(), buscar_icono=_icono_de_comando)
+                            al_terminar=_devolver_foco, padre=ventana_maya(), buscar_icono=_icono_de_comando,
+                            favoritos=lambda: ajustes().favoritos, al_favorito=_alternar_favorito)
         _estado["buscador"] = buscador
     return buscador
 
@@ -413,6 +414,14 @@ def _acciones_buscador():
                                                    extra.get("ayuda", ""), atajos.get(nombre, "")))
     for estante, botones in fuentes.estantes():
         acciones.extend(busqueda.accion_de_estante(estante, b) for b in botones)
+    try:
+        busqueda.unir_menus(acciones, fuentes.menus())
+    except Exception:  # sin los menús de Maya el buscador sigue funcionando
+        pass
+    try:
+        acciones.extend(busqueda.accion_de_script(ruta, t("buscador_mis_scripts")) for ruta in fuentes.scripts())
+    except Exception:
+        pass
     return acciones
 
 
@@ -422,6 +431,12 @@ def _al_buscar(accion, opciones=False):
     ajustes().guardar()
     acciones.ejecutar(accion["boton"], opciones=opciones)
     _actualizar_estados()
+
+
+def _alternar_favorito(accion):
+    from radial import busqueda
+    ajustes().favoritos = busqueda.alternar_favorito(ajustes().favoritos, accion)
+    ajustes().guardar()
 
 
 def _devolver_foco():

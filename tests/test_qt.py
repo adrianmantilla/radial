@@ -500,6 +500,34 @@ class PruebaBuscador(unittest.TestCase):
         self._escribir("")
         self.assertEqual(self.buscador.lista.titulo, "Usadas hace poco")
 
+    def test_estrella_de_favoritas(self):
+        favoritos = []
+        acciones = [busqueda.accion_de_comando(*c) for c in FuentesFalsas().comandos()]
+        buscador = Buscador(lambda: acciones, self.ejecutadas.append, recientes=lambda: self.recientes,
+                            favoritos=lambda: favoritos,
+                            al_favorito=lambda a: favoritos.__setitem__(
+                                slice(None), busqueda.alternar_favorito(favoritos, a)))
+        self.addCleanup(buscador.close)
+        buscador.campo.setText("pivot")
+        buscador.campo.textEdited.emit("pivot")
+        lista = buscador.lista
+        lista.setFixedWidth(360)
+        estrella = lista.zona_estrella(0).center().toPoint()
+        _clic(lista, estrella)
+        self.assertEqual(self.ejecutadas, [])  # la estrella no ejecuta
+        self.assertEqual([a["nombre"] for a in favoritos], ["CenterPivot"])
+        self.assertTrue(lista.es_favorita(lista.acciones[0]))
+        lista.grab()
+        # Sin texto salen primero las favoritas
+        self.recientes.append(busqueda.accion_de_comando("PolyExtrude"))
+        buscador.campo.setText("")
+        buscador.campo.textEdited.emit("")
+        self.assertEqual([a["nombre"] for a in lista.acciones], ["CenterPivot", "PolyExtrude"])
+        self.assertEqual(lista.titulo, "Favoritas · Usadas hace poco")
+        _clic(lista, lista.zona_estrella(0).center().toPoint())
+        self.assertEqual(favoritos, [])
+        self.assertEqual(lista.titulo, "Usadas hace poco")
+
     def test_clic_en_resultado(self):
         self._escribir("pivot")
         lista = self.buscador.lista

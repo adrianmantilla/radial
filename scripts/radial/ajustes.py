@@ -142,6 +142,19 @@ class Ajustes(object):
     def recientes(self, valor):
         self.datos["recientes"] = list(valor)
 
+    @property
+    def favoritos(self):
+        """Acciones del buscador marcadas con estrella (mismo formato que ``recientes``)."""
+        valor = self.datos.get("favoritos")
+        if not isinstance(valor, list):
+            return []
+        return [a for a in valor if isinstance(a, dict) and isinstance(a.get("boton"), dict)
+                and isinstance(a.get("texto"), str)]
+
+    @favoritos.setter
+    def favoritos(self, valor):
+        self.datos["favoritos"] = list(valor)
+
     # Carpeta de clase: radiales que comparte el profesor (también con RADIAL_CLASE)
     @property
     def carpeta_clase(self):

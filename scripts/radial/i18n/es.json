@@ -203,5 +203,7 @@
   "grabar_menu_principal": "Menú del doble Tab ({nombre})",
   "grabar_menu_extra": "Pill extra ({nombre})",
   "grabar_vacio": "Todavía no hay órdenes que guardar. Abre el Script Editor (Windows › General Editors › Script Editor), haz lo que quieras repetir y vuelve aquí. Si no salen órdenes, activa History › Echo All Commands en el Script Editor.",
-  "menu_grabar": "Crear botón con lo último que hice..."
+  "menu_grabar": "Crear botón con lo último que hice...",
+  "buscador_favoritos": "Favoritas",
+  "buscador_mis_scripts": "Mis scripts"
 }

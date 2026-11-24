@@ -13,6 +13,8 @@ Una acción es un diccionario con:
 - ``descripcion_en``: la ayuda original de Maya en inglés cuando ``descripcion`` es la traducida.
 - ``traduccion``: su nombre en el idioma del alumno («Centrar pivote»), o "".
 - ``atajo``: su atajo de teclado («Ctrl+E»), o "".
+- ``menu``: dónde está en los menús de Maya («Modify › Center Pivot»), o "".
+- ``etiqueta``: cómo se llama en ese menú si no es igual que ``texto`` (Maya en otro idioma), o "".
 - ``boton``: el botón de radial que se ejecuta.
 """
 
@@ -136,9 +138,11 @@ def _punto_palabra(palabra, nombres, palabras_nombres, nombre, resto):
 
 def _puntos(accion, palabras, glosario=None):
     """Menos es mejor. None si alguna palabra no está (ni en inglés ni en español)."""
-    nombres = [sin_acentos(accion["texto"]), sin_acentos(accion.get("traduccion", ""))]
+    nombres = [sin_acentos(accion["texto"]), sin_acentos(accion.get("traduccion", "")),
+               sin_acentos(accion.get("etiqueta", ""))]
     nombre = sin_acentos(accion["nombre"])
-    resto = sin_acentos(" ".join((accion["categoria"], accion["descripcion"], accion.get("descripcion_en", ""))))
+    resto = sin_acentos(" ".join((accion["categoria"], accion.get("menu", ""), accion["descripcion"],
+                                  accion.get("descripcion_en", ""))))
     palabras_nombres = [p for n in nombres for p in n.split()]
     total = 0
     for palabra in palabras:
@@ -154,11 +158,11 @@ def _puntos(accion, palabras, glosario=None):
     return total
 
 
-def buscar(acciones, consulta, recientes=(), limite=MAX_RESULTADOS, glosario=None):
+def buscar(acciones, consulta, recientes=(), limite=MAX_RESULTADOS, glosario=None, favoritos=()):
     """Las acciones que coinciden con ``consulta``, las mejores primero.
 
     Todas las palabras de la consulta tienen que aparecer, en cualquier orden.
-    Las usadas hace poco suben un poco.
+    Las usadas hace poco suben un poco y las favoritas (claves en ``favoritos``), algo más.
     """
     palabras = sin_acentos(consulta).split()
     if not palabras:
@@ -167,6 +171,7 @@ def buscar(acciones, consulta, recientes=(), limite=MAX_RESULTADOS, glosario=Non
         from radial.i18n import glosario as cargar_glosario
         glosario = cargar_glosario()
     recientes = list(recientes)
+    favoritos = set(favoritos)
     encontradas = []
     vistas = set()
     for orden, accion in enumerate(acciones):
@@ -179,19 +184,110 @@ def buscar(acciones, consulta, recientes=(), limite=MAX_RESULTADOS, glosario=Non
         vistas.add(k)
         if k in recientes:
             puntos -= 2
+        if k in favoritos:
+            puntos -= 3
         encontradas.append((puntos, len(accion["texto"]), orden, accion))
     encontradas.sort(key=lambda e: e[:3])
     return [e[3] for e in encontradas[:limite]]
+
+
+def accion_de_menu(ruta, etiqueta, boton):
+    """Una orden de los menús de Maya que no es un comando del Editor de atajos."""
+    return {
+        "texto": etiqueta,
+        "nombre": boton.get("accion", "").strip().splitlines()[0][:60] if boton.get("accion", "").strip() else "",
+        "categoria": " › ".join(ruta),
+        "menu": " › ".join(list(ruta) + [etiqueta]),
+        "descripcion": boton.get("descripcion", ""),
+        "traduccion": "",
+        "atajo": "",
+        "boton": {"texto": etiqueta[:40], "detalle": "", "icono": boton.get("icono", ""),
+                  "tipo": boton.get("tipo", "mel"), "accion": boton.get("accion", "")},
+    }
+
+
+def unir_menus(acciones, menus):
+    """Añade a ``acciones`` lo que hay en los menús de Maya.
+
+    ``menus`` es una lista de ``(ruta, etiqueta, boton)``. Si el menú lanza un comando
+    que ya está en ``acciones``, a ese comando se le apunta dónde está («Modify › Center Pivot»)
+    y la etiqueta del menú (la que se ve en Maya, también si Maya está en otro idioma).
+    Si no, se añade como acción nueva.
+    """
+    por_nombre = {a["nombre"]: a for a in acciones if a["boton"].get("tipo") == "comando"}
+    for ruta, etiqueta, boton in menus:
+        if not etiqueta or not boton.get("accion", "").strip():
+            continue
+        orden = boton["accion"].strip().rstrip(";").strip()
+        existente = por_nombre.get(orden)
+        if existente is not None:
+            if not existente.get("menu"):
+                existente["menu"] = " › ".join(list(ruta) + [etiqueta])
+                if sin_acentos(etiqueta) != sin_acentos(existente["texto"]):
+                    existente["etiqueta"] = etiqueta
+            continue
+        acciones.append(accion_de_menu(ruta, etiqueta, boton))
+    return acciones
+
+
+_PROPIOS = ("userSetup.py", "userSetup.mel")
+
+
+def accion_de_script(ruta, categoria):
+    """Un script propio (.py o .mel de la carpeta de scripts del usuario) como acción."""
+    import os
+    archivo = ruta.replace("\\", "/").rsplit("/", 1)[-1]
+    nombre, extension = os.path.splitext(archivo)
+    if extension.lower() == ".mel":
+        tipo, orden = "mel", 'source "{}";'.format(ruta.replace("\\", "/"))
+    else:
+        tipo, orden = "python", "import runpy\nrunpy.run_path({!r}, run_name=\"__main__\")".format(ruta)
+    return {
+        "texto": texto_de_comando(nombre),
+        "nombre": archivo,
+        "categoria": categoria,
+        "descripcion": ruta,
+        "traduccion": "",
+        "atajo": "",
+        "boton": {"texto": texto_de_comando(nombre)[:40], "detalle": "", "icono": "", "tipo": tipo,
+                  "accion": orden},
+    }
+
+
+def es_script(archivo):
+    """True para los .py y .mel que se pueden lanzar como orden (no los internos ni userSetup)."""
+    import os
+    nombre, extension = os.path.splitext(archivo)
+    return (extension.lower() in (".py", ".mel") and archivo not in _PROPIOS
+            and not nombre.startswith(("_", ".")))
+
+
+def es_favorita(favoritos, accion):
+    k = clave(accion)
+    return any(clave(a) == k for a in favoritos if isinstance(a, dict) and "boton" in a)
+
+
+def alternar_favorito(favoritos, accion):
+    """Quita ``accion`` de ``favoritos`` si estaba; si no, la añade al final."""
+    k = clave(accion)
+    resto = [a for a in favoritos if isinstance(a, dict) and "boton" in a and clave(a) != k]
+    if len(resto) != len([a for a in favoritos if isinstance(a, dict) and "boton" in a]):
+        return resto
+    return resto + [_guardable(accion)]
+
+
+def _guardable(accion):
+    guardada = {c: accion.get(c, "") for c in ("texto", "nombre", "categoria", "menu", "descripcion",
+                                                 "descripcion_en", "traduccion", "atajo")}
+    guardada["boton"] = dict(accion["boton"])
+    return guardada
 
 
 def anadir_reciente(recientes, accion, limite=MAX_RECIENTES):
     """Pone ``accion`` la primera de ``recientes`` (lista de acciones) sin repetirla."""
     k = clave(accion)
     resto = [a for a in recientes if isinstance(a, dict) and "boton" in a and clave(a) != k]
-    guardada = {c: accion.get(c, "") for c in ("texto", "nombre", "categoria", "descripcion", "descripcion_en",
-                                                 "traduccion", "atajo")}
-    guardada["boton"] = dict(accion["boton"])
-    return [guardada] + resto[:limite - 1]
+    return [_guardable(accion)] + resto[:limite - 1]
 
 
 def partes_resaltadas(texto, consulta):

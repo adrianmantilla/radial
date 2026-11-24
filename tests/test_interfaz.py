@@ -405,6 +405,83 @@ class PruebaInterfaz(unittest.TestCase):
         ejecutar.assert_not_called()
         self.assertTrue(self.cmds.confirmDialog.called)
 
+    def test_menus_de_maya_en_el_buscador(self):
+        from radial import fuentes_maya
+
+        class Menus(object):
+            """Un menú «Modify» con un submenú, un divisor, una caja de opciones y una orden en Python."""
+            items = {
+                "MayaWindow|mainModifyMenu": ["m1", "m2", "m3", "m4", "m5"],
+                "MayaWindow|mainModifyMenu|m4": ["s1"],
+            }
+            datos = {
+                "m1": dict(label="Centrar pivote", runTimeCommand="CenterPivot"),
+                "m2": dict(divider=True),
+                "m3": dict(label="", optionBox=True),
+                "m4": dict(label="Pivot", subMenu=True),
+                "m5": dict(label="Mi orden...", command="print('hola')", sourceType="python"),
+                "s1": dict(label="Bake Pivot", command="BakeCustomToolPivot;"),
+            }
+
+            def window(self, nombre, **k):
+                return ["mainModifyMenu"]
+
+            def menu(self, nombre, **k):
+                if k.get("label"):
+                    return "&Modify"
+                if k.get("itemArray"):
+                    return []  # todavía sin crear: hay que llamar a su postMenuCommand
+                if k.get("postMenuCommand"):
+                    return "buildModifyMenu MayaWindow|mainModifyMenu"
+                return None
+
+            def menuItem(self, nombre, **k):
+                if k.get("itemArray"):
+                    return Menus.items.get(nombre, [])
+                propio = Menus.datos[nombre.split("|")[-1]]
+                for clave in k:
+                    if clave != "query":
+                        return propio.get(clave, "" if clave not in ("divider", "optionBox", "subMenu")
+                                          else False)
+
+        construidos = []
+        falsos = Menus()
+        original = falsos.menu
+
+        def menu(nombre, **k):
+            if k.get("itemArray") and construidos:
+                return Menus.items[nombre]
+            return original(nombre, **k)
+
+        falsos.menu = menu
+        mel = mock.MagicMock()
+        mel.eval.side_effect = construidos.append
+        with mock.patch.object(fuentes_maya, "cmds", falsos), mock.patch.object(fuentes_maya, "mel", mel):
+            menus = fuentes_maya.FuentesMaya().menus()
+        self.assertEqual(construidos, ["buildModifyMenu MayaWindow|mainModifyMenu"])
+        self.assertEqual([(r, e, b["tipo"], b["accion"]) for r, e, b in menus], [
+            (["Modify"], "Centrar pivote", "comando", "CenterPivot"),
+            (["Modify", "Pivot"], "Bake Pivot", "mel", "BakeCustomToolPivot;"),
+            (["Modify"], "Mi orden", "python", "print('hola')"),
+        ])
+
+    def test_scripts_propios_en_el_buscador(self):
+        from radial import fuentes_maya
+        for archivo in ("limpiar.py", "renombrar.mel", "userSetup.py", "notas.txt"):
+            open(os.path.join(self.tmp.name, archivo), "w").close()
+        rutas = fuentes_maya.FuentesMaya().scripts()
+        self.assertEqual([os.path.basename(r) for r in rutas], ["limpiar.py", "renombrar.mel"])
+        acciones = self.im._acciones_buscador()
+        self.assertIn("Mis scripts", [a["categoria"] for a in acciones])
+
+    def test_favoritas_se_guardan(self):
+        from radial import busqueda
+        accion = busqueda.accion_de_comando("CenterPivot")
+        self.im._alternar_favorito(accion)
+        self.assertEqual([a["nombre"] for a in self.im.ajustes().favoritos], ["CenterPivot"])
+        self.im._alternar_favorito(accion)
+        self.assertEqual(self.im.ajustes().favoritos, [])
+
     def test_volver_a_centrar(self):
         self.im._al_mover(QtCore.QPoint(10, 10))
         self.im.volver_a_centrar()

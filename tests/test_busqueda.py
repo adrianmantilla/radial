@@ -109,5 +109,56 @@ class PruebaIdiomas(unittest.TestCase):
         self.assertEqual(bq.candidatos_icono(""), [])
 
 
+class PruebaMenusScriptsFavoritos(unittest.TestCase):
+    def _acciones(self):
+        return [dict(a, boton=dict(a["boton"])) for a in ACCIONES]
+
+    def test_menus_de_maya(self):
+        acciones = bq.unir_menus(self._acciones(), [
+            (["Modify", "Pivot"], "Centrar pivote", {"tipo": "comando", "accion": "CenterPivot"}),
+            (["Mesh"], "Smooth Proxy", {"tipo": "mel", "accion": "performSmoothProxy 0;"}),
+            (["Mesh"], "", {"tipo": "mel", "accion": "nada;"}),
+            (["Mesh"], "Vacío", {"tipo": "mel", "accion": "  "}),
+        ])
+        self.assertEqual(len(acciones), len(ACCIONES) + 1)
+        centro = [a for a in acciones if a["nombre"] == "CenterPivot"][0]
+        self.assertEqual(centro["menu"], "Modify › Pivot › Centrar pivote")
+        self.assertEqual(centro["etiqueta"], "Centrar pivote")
+        # Se encuentra por la etiqueta del menú (Maya en español) y por el menú
+        self.assertEqual(bq.buscar(acciones, "centrar pivote", glosario={})[0]["nombre"], "CenterPivot")
+        nuevo = acciones[-1]
+        self.assertEqual(nuevo["texto"], "Smooth Proxy")
+        self.assertEqual(nuevo["categoria"], "Mesh")
+        self.assertEqual(nuevo["boton"]["accion"], "performSmoothProxy 0;")
+        self.assertEqual(bq.buscar(acciones, "smooth proxy", glosario={})[0]["texto"], "Smooth Proxy")
+
+    def test_scripts_propios(self):
+        self.assertTrue(bq.es_script("limpiar_escena.py"))
+        self.assertTrue(bq.es_script("Renombrar.MEL"))
+        for archivo in ("userSetup.py", "userSetup.mel", "__init__.py", "_privado.py", "notas.txt"):
+            self.assertFalse(bq.es_script(archivo), archivo)
+        py = bq.accion_de_script("/u/scripts/limpiarEscena.py", "Mis scripts")
+        self.assertEqual(py["texto"], "limpiar Escena")
+        self.assertEqual(py["boton"]["tipo"], "python")
+        self.assertIn("runpy.run_path('/u/scripts/limpiarEscena.py'", py["boton"]["accion"])
+        compile(py["boton"]["accion"], "<prueba>", "exec")
+        mel = bq.accion_de_script("C:\\scripts\\renombrar.mel", "Mis scripts")
+        self.assertEqual(mel["boton"], dict(mel["boton"], tipo="mel", accion='source "C:/scripts/renombrar.mel";'))
+        self.assertEqual(bq.buscar([py, mel], "renombrar", glosario={})[0]["nombre"], "renombrar.mel")
+
+    def test_favoritas(self):
+        acciones = self._acciones()
+        favoritos = bq.alternar_favorito([], acciones[1])
+        self.assertTrue(bq.es_favorita(favoritos, acciones[1]))
+        self.assertFalse(bq.es_favorita(favoritos, acciones[2]))
+        # Suben en los resultados
+        normal = bq.buscar(acciones, "extr", glosario={})
+        con = bq.buscar(acciones, "extr", glosario={}, favoritos=[bq.clave(a) for a in favoritos])
+        self.assertEqual(normal[0]["nombre"], "ExtractFace")
+        self.assertEqual(con[0]["nombre"], "PolyExtrude")
+        # Otra vez: se quita
+        self.assertEqual(bq.alternar_favorito(favoritos, acciones[1]), [])
+
+
 if __name__ == "__main__":
     unittest.main()
