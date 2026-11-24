@@ -8,6 +8,8 @@ veces repite el KeyPress en los widgets padre. Todos llevan la misma marca de
 tiempo, así que la decisión se toma una vez por pulsación y se aplica a todos.
 """
 
+import ctypes
+import sys
 import time
 
 from radial.detector_tab import DetectorDobleTab
@@ -37,6 +39,39 @@ def _ahora_ms():
     return int(time.monotonic() * 1000)
 
 
+_consulta_tab = []
+
+
+def _preparar_consulta_tab():
+    """La función del sistema que dice si Tab está pulsada ahora (o None si no hay)."""
+    try:
+        if sys.platform == "darwin":
+            ruta = "/System/Library/Frameworks/ApplicationServices.framework/ApplicationServices"
+            funcion = ctypes.cdll.LoadLibrary(ruta).CGEventSourceKeyState
+            funcion.restype = ctypes.c_bool
+            funcion.argtypes = [ctypes.c_int32, ctypes.c_uint16]
+            return lambda: bool(funcion(0, 48))  # sesión combinada, kVK_Tab
+        if sys.platform == "win32":
+            funcion = ctypes.windll.user32.GetAsyncKeyState
+            return lambda: bool(funcion(0x09) & 0x8000)  # VK_TAB
+    except Exception:  # noqa: BLE001 (sin la función se usan solo los eventos de Qt)
+        pass
+    return None
+
+
+def tab_pulsado():
+    """True o False si el sistema dice si la tecla Tab está pulsada ahora; None si no se puede saber."""
+    if not _consulta_tab:
+        _consulta_tab.append(_preparar_consulta_tab())
+    consulta = _consulta_tab[0]
+    if consulta is None:
+        return None
+    try:
+        return consulta()
+    except Exception:  # noqa: BLE001
+        return None
+
+
 class FiltroTeclado(QtCore.QObject):
     """Filtro de eventos para ``QApplication``.
 
@@ -62,6 +97,8 @@ class FiltroTeclado(QtCore.QObject):
         self._objetivos = []
         self._al_soltar_tab = al_soltar_tab
         self.manteniendo = False  # el segundo Tab del doble Tab sigue pulsado
+        self.ultimo_tab = 0  # cuándo llegó el último evento de ese Tab (también su auto-repetición)
+        self._tragar_soltar = False
 
     def instalar(self, ventanas=None):
         """Empieza a escuchar.
@@ -113,6 +150,7 @@ class FiltroTeclado(QtCore.QObject):
         if tipo == QEvent.KeyRelease:
             return self._soltar(evento)
         if self.manteniendo and evento.key() == Qt.Key_Tab and evento.isAutoRepeat():
+            self.ultimo_tab = _ahora_ms()
             evento.accept()
             return True  # la auto-repetición del segundo Tab no llega a Maya
         if evento.key() != Qt.Key_Tab:
@@ -124,6 +162,7 @@ class FiltroTeclado(QtCore.QObject):
         sello = evento.timestamp()
         if not self._misma_pulsacion(sello, ahora):
             self.manteniendo = False  # una pulsación nueva: el gesto anterior ya acabó
+            self._tragar_soltar = False
             self._sello = sello
             self._momento_decision = ahora
             self._quedarse = self._decidir(evento, sello or ahora)
@@ -146,18 +185,31 @@ class FiltroTeclado(QtCore.QObject):
         foco = self._foco_primer_tab
         self._foco_primer_tab = None
         self.manteniendo = True
+        self.ultimo_tab = _ahora_ms()
         QtCore.QTimer.singleShot(0, lambda: self._avisar(foco))
         return True
 
     def _soltar(self, evento):
-        if evento.key() != Qt.Key_Tab or not self.manteniendo:
+        if evento.key() != Qt.Key_Tab or not (self.manteniendo or self._tragar_soltar):
             return False
         if not evento.isAutoRepeat():
+            avisar = self.manteniendo
             self.manteniendo = False
-            if self._al_soltar_tab is not None:
+            self._tragar_soltar = False
+            if avisar and self._al_soltar_tab is not None:
                 QtCore.QTimer.singleShot(0, self._al_soltar_tab)
         evento.accept()
         return True
+
+    def terminar(self):
+        """Da por soltado el segundo Tab sin esperar a su evento (que a veces no llega).
+
+        Si el evento llega después, el filtro se lo sigue quedando: Maya no ve un
+        Tab soltado sin haberlo visto pulsado.
+        """
+        if self.manteniendo:
+            self.manteniendo = False
+            self._tragar_soltar = True
 
     def _avisar(self, foco):
         if sigue_vivo(foco) and QtWidgets.QApplication.focusWidget() is not foco:

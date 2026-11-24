@@ -99,6 +99,26 @@ class PruebaFiltro(unittest.TestCase):
         evento = QtGui.QKeyEvent(QEvent.KeyRelease, Qt.Key_Tab, Qt.NoModifier, "\t", False)
         self.assertFalse(self.filtro.eventFilter(self.destino, evento))
 
+    def test_terminar_sin_evento_de_soltar(self):
+        soltados = []
+        self.filtro._al_soltar_tab = lambda: soltados.append(1)
+        _tecla(self.destino, 1000)
+        _tecla(self.destino, 1180)
+        self.filtro.terminar()
+        self.assertFalse(self.filtro.manteniendo)
+        # Si el soltar llega tarde, Maya tampoco lo ve, pero no vuelve a avisar
+        evento = QtGui.QKeyEvent(QEvent.KeyRelease, Qt.Key_Tab, Qt.NoModifier, "\t", False)
+        self.assertTrue(self.filtro.eventFilter(self.destino, evento))
+        self._procesar()
+        self.assertEqual(soltados, [])
+        # Y el siguiente soltar ya es de Maya
+        self.assertFalse(self.filtro.eventFilter(self.destino, evento))
+
+    def test_tab_pulsado_sin_sistema_conocido(self):
+        from radial import filtro_teclado
+        if sys.platform not in ("darwin", "win32"):
+            self.assertIsNone(filtro_teclado.tab_pulsado())
+
     def test_dos_tab_lentos_llegan_los_dos(self):
         self.assertEqual(len(_tecla(self.destino, 1000)), 2)
         self.assertEqual(len(_tecla(self.destino, 1400)), 2)

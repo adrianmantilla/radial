@@ -11,7 +11,7 @@ from radial import detector_tab as dt
 from radial import radiales as rd
 from radial.biblioteca import Biblioteca
 from radial.i18n import sinonimos, t
-from radial.qt import QtCore, QtGui, destruir, sigue_vivo, ventana_maya
+from radial.qt import QtCore, QtGui, QtWidgets, destruir, sigue_vivo, ventana_maya
 
 MENU = "RadialMenu"
 MENU_RADIALES = "RadialMenuRadiales"
@@ -1090,7 +1090,12 @@ def _al_doble_tab():
         _empezar_gesto()
 
 
+# Sin auto-repetición de Tab en este tiempo (y sin poder preguntar al sistema), se da por soltado.
+GESTO_SIN_REPETICION_MS = 1200
+
+
 def _empezar_gesto():
+    from radial.filtro_teclado import _ahora_ms, tab_pulsado
     reloj = _estado.get("reloj_gesto")
     if not sigue_vivo(reloj):
         reloj = QtCore.QTimer(ventana_maya())
@@ -1098,15 +1103,47 @@ def _empezar_gesto():
         reloj.timeout.connect(_seguir_gesto)
         _estado["reloj_gesto"] = reloj
     _estado["gesto"] = QtGui.QCursor.pos()
+    _estado["gesto_ms"] = _ahora_ms()
+    # Si el sistema dice ahora que Tab está pulsada, se le puede preguntar mientras dure el gesto.
+    _estado["gesto_nativo"] = tab_pulsado() is True
+    # El soltar de Tab puede llegar a la ventana del menú en vez de a la de Maya: se escucha también.
+    filtro = _estado.get("filtro")
+    menu = _menu_flotante(crear=False)
+    if filtro is not None and menu is not None and menu.windowHandle() is not None:
+        filtro.escuchar(menu.windowHandle())
     reloj.start()
+
+
+def _tab_sigue_pulsado(filtro):
+    """Si el segundo Tab sigue pulsado, aunque su evento de soltar no haya llegado."""
+    from radial.filtro_teclado import _ahora_ms, tab_pulsado
+    if _estado.get("gesto_nativo"):
+        return tab_pulsado() is not False
+    ultimo = max(filtro.ultimo_tab, _estado.get("gesto_ms", 0))
+    return _ahora_ms() - ultimo < GESTO_SIN_REPETICION_MS
 
 
 def _seguir_gesto():
     menu = _menu_flotante(crear=False)
     inicio = _estado.get("gesto")
     filtro = _estado.get("filtro")
-    if menu is None or inicio is None or not menu.isVisible() or filtro is None or not filtro.manteniendo:
-        _parar_gesto()
+    if menu is None or inicio is None or not menu.isVisible() or filtro is None:
+        _cancelar_gesto()
+        return
+    if not filtro.manteniendo:
+        _parar_gesto()  # Tab se soltó y su aviso (_al_soltar_tab) ya está en camino
+        return
+    if QtWidgets.QApplication.mouseButtons() != QtCore.Qt.NoButton:
+        filtro.terminar()
+        _cancelar_gesto()  # un clic durante el gesto: manda el clic
+        return
+    if not _tab_sigue_pulsado(filtro):
+        # El evento de soltar Tab no ha llegado, pero Tab ya no está pulsada.
+        filtro.terminar()
+        if _estado.get("gesto_nativo"):
+            _al_soltar_tab()  # el sistema lo sabe seguro: cuenta como soltar
+        else:
+            _cancelar_gesto()
         return
     menu.marcar_gesto(menu.boton_en_gesto(inicio, QtGui.QCursor.pos()))
 
@@ -1115,6 +1152,16 @@ def _parar_gesto():
     reloj = _estado.get("reloj_gesto")
     if sigue_vivo(reloj):
         reloj.stop()
+
+
+def _cancelar_gesto():
+    """Deja de seguir el ratón sin ejecutar nada y quita el resaltado del gesto."""
+    _parar_gesto()
+    if _estado.pop("gesto", None) is None:
+        return
+    menu = _menu_flotante(crear=False)
+    if menu is not None and menu.isVisible():
+        menu.marcar_gesto(None)
 
 
 def _al_soltar_tab():
