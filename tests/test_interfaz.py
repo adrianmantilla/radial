@@ -339,6 +339,54 @@ class PruebaInterfaz(unittest.TestCase):
         self.assertFalse(self.im.visible())
         self.assertTrue(self.cmds.method_calls or sys.modules["maya.mel"].eval.called, esperado)
 
+    def test_gesto_sin_evento_de_soltar_no_se_queda_pegado(self):
+        """Si el soltar de Tab no llega, el gesto no sigue al ratón para siempre."""
+        from radial import filtro_teclado
+        filtro = self.im._estado["filtro"]
+        filtro.manteniendo = True
+        with mock.patch.object(filtro_teclado, "tab_pulsado", lambda: None), \
+                mock.patch.object(QtGui.QCursor, "pos", staticmethod(lambda: QtCore.QPoint(-3000, -3000))):
+            self.im._al_doble_tab()
+        menu = self.im._menu_flotante(crear=False)
+        filtro.ultimo_tab = 0
+        self.im._estado["gesto_ms"] -= self.im.GESTO_SIN_REPETICION_MS + 1
+        with mock.patch.object(QtGui.QCursor, "pos", staticmethod(lambda: QtCore.QPoint(-3000, -2900))):
+            self.im._seguir_gesto()
+            self.assertFalse(filtro.manteniendo)
+            self.assertIsNone(menu._sobre)
+            self.im._seguir_gesto()
+            self.assertIsNone(menu._sobre)
+        self.assertTrue(self.im.visible())
+        self.assertNotIn("gesto", self.im._estado)
+
+    def test_gesto_termina_cuando_el_sistema_dice_que_se_solto(self):
+        from radial import filtro_teclado
+        filtro = self.im._estado["filtro"]
+        filtro.manteniendo = True
+        pulsado = [True]
+        with mock.patch.object(filtro_teclado, "tab_pulsado", lambda: pulsado[0]):
+            with mock.patch.object(QtGui.QCursor, "pos", staticmethod(lambda: QtCore.QPoint(-3000, -3000))):
+                self.im._al_doble_tab()
+            with mock.patch.object(QtGui.QCursor, "pos", staticmethod(lambda: QtCore.QPoint(-3000, -2900))):
+                self.im._seguir_gesto()
+                self.assertEqual(self.im._menu_flotante(crear=False)._sobre, 3)
+                pulsado[0] = False
+                self.im._seguir_gesto()
+        self.assertFalse(filtro.manteniendo)
+        self.assertFalse(self.im.visible())  # se ejecutó el botón y el menú se cerró
+
+    def test_soltar_normal_aunque_el_reloj_pase_antes(self):
+        filtro = self.im._estado["filtro"]
+        filtro.manteniendo = True
+        with mock.patch.object(QtGui.QCursor, "pos", staticmethod(lambda: QtCore.QPoint(-3000, -3000))):
+            self.im._al_doble_tab()
+        with mock.patch.object(QtGui.QCursor, "pos", staticmethod(lambda: QtCore.QPoint(-3000, -2900))):
+            self.im._seguir_gesto()
+            filtro.manteniendo = False  # llegó el soltar; su aviso va después del reloj
+            self.im._seguir_gesto()
+            self.im._al_soltar_tab()
+        self.assertFalse(self.im.visible())
+
     def test_soltar_sin_moverse_deja_el_menu(self):
         filtro = self.im._estado["filtro"]
         filtro.manteniendo = True

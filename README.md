@@ -15,7 +15,7 @@ Cada botón lanza la orden de Maya que tú elijas.
 - Tema oscuro o claro, color de acento, iconos de Radial o de Maya, e interfaz en español o en inglés.
 - Se guarda, se exporta y se comparte como un archivo `.radial`. No cambia ningún atajo de Maya.
 
-No necesita instalar nada más: funciona con el Python que trae Maya. Versión **1.3.0**.
+No necesita instalar nada más: funciona con el Python que trae Maya. Versión **1.3.1**.
 
 > *English summary:* Radial is a floating menu for Maya 2026/2027 (Windows and macOS). Hover a viewport and
 > press **Tab twice quickly** to show or hide it, or hold the second Tab, flick towards a button and release.
