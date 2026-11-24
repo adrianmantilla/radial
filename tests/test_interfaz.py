@@ -482,6 +482,45 @@ class PruebaInterfaz(unittest.TestCase):
         self.im._alternar_favorito(accion)
         self.assertEqual(self.im.ajustes().favoritos, [])
 
+    def test_paquete_de_clase(self):
+        from radial import paquete, pill_extra
+        ruta = os.path.join(self.tmp.name, "clase", "modelado.radialclase")
+        self.im.cambiar_forma("pill", True)
+        pill_extra.activar(True)
+        pill_extra.cambiar_cantidad(3)
+        self.cmds.confirmDialog.side_effect = lambda **k: k["button"][0]  # «Fijar opciones»
+        self.cmds.fileDialog2.return_value = [ruta]
+        self.assertEqual(self.im.exportar_paquete(), ruta)
+        self.assertEqual(paquete.leer(ruta)["fijas"], list(paquete.OPCIONES))
+        # Un alumno con otras opciones lo importa
+        self.im.cambiar_forma("radial")
+        pill_extra.activar(False)
+        self.assertTrue(self.im.importar_paquete(ruta))
+        self.assertEqual((self.im.ajustes().forma, self.im.ajustes().pill_vertical), ("pill", True))
+        self.assertTrue(self.im.biblioteca().origen.startswith("mio:"))
+        self.assertTrue(pill_extra.ajustes().activa)
+        self.assertEqual(len(pill_extra.biblioteca().activo["botones"]), 3)
+        # En la carpeta de clase, las opciones quedan fijadas y bloqueadas en Ajustes
+        self.im.cambiar_forma("radial")
+        self.im.cambiar_opcion("carpeta_clase", os.path.dirname(ruta))
+        self.assertEqual(self.im.ajustes().forma, "pill")
+        ventana = self.im.abrir_ajustes()
+        self.assertFalse(ventana.forma_radial.isEnabled())
+        self.assertFalse(ventana.velocidad.isEnabled())
+        self.assertTrue(ventana.forma_pill.isChecked())
+        self.assertFalse(ventana.nota_fijadas.isHidden())
+        self.assertTrue(ventana.cantidad.isEnabled())  # lo demás sigue libre
+        self.im.cambiar_opcion("carpeta_clase", "")
+        self.assertEqual(self.im.ajustes().forma, "radial")
+        self.assertTrue(ventana.forma_radial.isEnabled())
+
+    def test_paquete_roto(self):
+        ruta = os.path.join(self.tmp.name, "roto.radialclase")
+        with open(ruta, "w") as f:
+            f.write("{}")
+        self.assertFalse(self.im.importar_paquete(ruta))
+        self.assertTrue(self.cmds.warning.called)
+
     def test_volver_a_centrar(self):
         self.im._al_mover(QtCore.QPoint(10, 10))
         self.im.volver_a_centrar()

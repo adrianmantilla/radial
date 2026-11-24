@@ -9,7 +9,7 @@ RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(RAIZ, "scripts"))
 
 from radial import ajustes as aj  # noqa: E402
-from radial import automatico, grabar, interruptores  # noqa: E402
+from radial import automatico, grabar, interruptores, paquete  # noqa: E402
 from radial import radiales as rd  # noqa: E402
 from radial.biblioteca import CLASE, MIO, Biblioteca  # noqa: E402
 from radial.i18n import sinonimos  # noqa: E402
@@ -231,6 +231,56 @@ sin punto y coma
         self.assertEqual(grabar.boton(["a;", "b;"], "Mío")["accion"], "a;\nb;")
         self.assertIsNone(grabar.boton([]))
         rd.normalizar_boton(boton)  # es un botón válido
+
+
+class PruebaPaquete(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.ajustes = aj.Ajustes(os.path.join(self.tmp.name, "prefs"))
+
+    def test_ida_y_vuelta(self):
+        self.ajustes.forma = "pill"
+        self.ajustes.carpetas = True
+        datos = paquete.crear("Modelado 1º", rd.por_defecto(), self.ajustes, extra=rd.cambiar_cantidad(
+            rd.por_defecto(), 4), extra_activa=True, fijar=True)
+        ruta = paquete.escribir(datos, os.path.join(self.tmp.name, "clase", "modelado"))
+        self.assertTrue(ruta.endswith(".radialclase"))
+        leido = paquete.leer(ruta)
+        self.assertEqual(leido["nombre"], "Modelado 1º")
+        self.assertEqual(len(leido["extra"]["botones"]), 4)
+        self.assertTrue(leido["extra_activa"])
+        self.assertEqual(leido["opciones"]["forma"], "pill")
+        self.assertEqual(set(leido["fijas"]), set(paquete.OPCIONES))
+
+    def test_no_valido(self):
+        ruta = os.path.join(self.tmp.name, "x.radialclase")
+        for contenido in ("no es json", "{}", '{"paquete_radial": 99, "menu": {}}', '{"paquete_radial": 1}'):
+            with open(ruta, "w") as f:
+                f.write(contenido)
+            with self.assertRaises(paquete.PaqueteNoValido):
+                paquete.leer(ruta)
+
+    def test_opciones_fijadas_en_la_carpeta_de_clase(self):
+        clase = os.path.join(self.tmp.name, "clase")
+        self.ajustes.forma = "radial"
+        self.ajustes.aprendizaje = False
+        profesor = aj.Ajustes(os.path.join(self.tmp.name, "profesor"))
+        profesor.forma = "pill"
+        paquete.escribir(paquete.crear("A", rd.por_defecto(), profesor, fijar=True), os.path.join(clase, "a"))
+        paquete.escribir(paquete.crear("B", rd.por_defecto(), self.ajustes), os.path.join(clase, "b"))
+        fijadas = paquete.fijadas_de_carpeta(clase)
+        self.assertEqual(fijadas["forma"], "pill")
+        self.assertTrue(fijadas["aprendizaje"])
+        self.ajustes.fijar_opciones(fijadas)
+        self.assertEqual(self.ajustes.forma, "pill")
+        self.assertTrue(self.ajustes.aprendizaje)
+        self.ajustes.forma = "radial"  # el alumno no puede cambiarla mientras esté fijada
+        self.assertEqual(self.ajustes.forma, "pill")
+        self.ajustes.fijar_opciones({})  # sin carpeta de clase, vuelven las suyas
+        self.assertEqual(self.ajustes.forma, "radial")
+        self.assertFalse(self.ajustes.aprendizaje)
+        self.assertEqual(paquete.fijadas_de_carpeta(os.path.join(self.tmp.name, "no_existe")), {})
 
 
 class PruebaGlosario(unittest.TestCase):

@@ -24,11 +24,33 @@ REGLAS_POR_DEFECTO = {
 _ARCHIVO = "ajustes.json"
 
 
+def _fijable(leer):
+    """Para una opción que el profesor puede fijar: si está en ``fijadas``, manda ese valor."""
+    clave = leer.__name__
+
+    def leer_o_fijada(self):
+        fijadas = getattr(self, "fijadas", None) or {}
+        return fijadas[clave] if clave in fijadas else leer(self)
+
+    leer_o_fijada.__name__ = clave
+    leer_o_fijada.__doc__ = leer.__doc__
+    return leer_o_fijada
+
+
 class Ajustes(object):
     def __init__(self, carpeta_preferencias):
         self.carpeta = carpeta_preferencias
         self.ruta = os.path.join(carpeta_preferencias, _ARCHIVO)
         self.datos = self._leer()
+        # Opciones que fija el profesor desde la carpeta de clase (no se guardan: mandan mientras estén)
+        self.fijadas = {}
+
+    def fijar_opciones(self, opciones):
+        """Pone las opciones que fija el profesor. Las del alumno no se tocan y vuelven al quitarlas."""
+        prueba = Ajustes.__new__(Ajustes)
+        prueba.datos, prueba.fijadas = dict(opciones or {}), {}
+        self.fijadas = {clave: getattr(prueba, clave) for clave in (opciones or {})
+                        if isinstance(getattr(Ajustes, clave, None), property)}
 
     def _leer(self):
         try:
@@ -47,6 +69,7 @@ class Ajustes(object):
 
     # Velocidad del doble Tab
     @property
+    @_fijable
     def ventana_ms(self):
         return detector_tab.limitar_ventana(self.datos.get("ventana_ms"))
 
@@ -82,6 +105,7 @@ class Ajustes(object):
 
     # Forma del menú: «radial» (anillo de puntos) o «pill» (cápsula)
     @property
+    @_fijable
     def forma(self):
         valor = self.datos.get("forma")
         return valor if valor in FORMAS else FORMAS[0]
@@ -91,6 +115,7 @@ class Ajustes(object):
         self.datos["forma"] = valor if valor in FORMAS else FORMAS[0]
 
     @property
+    @_fijable
     def pill_vertical(self):
         return self.datos.get("pill_vertical") is True
 
@@ -123,6 +148,7 @@ class Ajustes(object):
 
     # Buscador de acciones bajo el menú
     @property
+    @_fijable
     def buscador(self):
         return self.datos.get("buscador") is not False
 
@@ -172,6 +198,7 @@ class Ajustes(object):
 
     # Opciones que se activan en Ajustes
     @property
+    @_fijable
     def carpetas(self):
         return self.datos.get("carpetas") is True
 
@@ -180,6 +207,7 @@ class Ajustes(object):
         self.datos["carpetas"] = bool(valor)
 
     @property
+    @_fijable
     def automatico(self):
         return self.datos.get("automatico") is True
 
@@ -210,6 +238,7 @@ class Ajustes(object):
         self.datos["atajo"] = valor or ""
 
     @property
+    @_fijable
     def aprendizaje(self):
         return self.datos.get("aprendizaje") is not False
 

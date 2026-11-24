@@ -209,6 +209,101 @@ def exportar_bloqueado():
     print(t("exportado_bloqueado", ruta=ruta))
 
 
+# --- Paquete de clase -----------------------------------------------------------
+
+def cargar_fijadas():
+    """Lee las opciones que fija el profesor en la carpeta de clase. Devuelve True si cambió algo."""
+    from radial import paquete
+    antes = dict(ajustes().fijadas)
+    ajustes().fijar_opciones(paquete.fijadas_de_carpeta(ajustes().carpeta_clase))
+    return ajustes().fijadas != antes
+
+
+def _aplicar_opciones_vigentes(forma_antes):
+    """Tras cambiar las opciones (paquete o carpeta de clase), pone al día lo que se ve."""
+    filtro = _estado["filtro"]
+    if filtro is not None:
+        filtro.detector.ventana_ms = ajustes().ventana_ms
+    if (ajustes().forma, ajustes().pill_vertical) != forma_antes:
+        estaba_visible = visible()
+        _destruir_menu_flotante()
+        if estaba_visible:
+            mostrar()
+    buscador = _estado.get("buscador")
+    if sigue_vivo(buscador):
+        buscador.activo = ajustes().buscador
+        buscador.actualizar()
+    from radial import pill_extra
+    pill_extra.fijar_carpetas(ajustes().carpetas)
+    if not ajustes().aprendizaje:
+        _ocultar_tarjeta()
+    _estado["contexto"] = None
+    _reloj_automatico()
+
+
+def exportar_paquete():
+    """El profesor exporta su menú, su pill extra y sus opciones en un archivo para la clase."""
+    from radial import paquete, pill_extra
+    fijar, no_fijar, cancelar = t("boton_fijar"), t("boton_no_fijar"), t("boton_cancelar")
+    respuesta = cmds.confirmDialog(title=t("menu_exportar_paquete"), message=t("paquete_fijar_pregunta"),
+                                   button=[fijar, no_fijar, cancelar], defaultButton=no_fijar,
+                                   cancelButton=cancelar, dismissString=cancelar)
+    if respuesta not in (fijar, no_fijar):
+        return None
+    inicio = os.path.join(ajustes().carpeta_clase or "", rd.nombre_de_archivo(_nombre_activo()) + paquete.EXTENSION)
+    rutas = cmds.fileDialog2(fileFilter=t("filtro_paquete"), fileMode=0, caption=t("menu_exportar_paquete"),
+                             okCaption=t("boton_exportar"), startingDirectory=inicio)
+    if not rutas:
+        return None
+    extra_activa = pill_extra.ajustes().activa
+    datos = paquete.crear(_nombre_activo(), radial_activo(), ajustes(),
+                          extra=pill_extra.biblioteca().activo if extra_activa else None,
+                          extra_activa=extra_activa, fijar=respuesta == fijar)
+    try:
+        ruta = paquete.escribir(datos, rutas[0])
+    except (paquete.PaqueteNoValido, OSError) as error:
+        cmds.warning(t("gestor_error", error=error))
+        return None
+    print(t("paquete_exportado", ruta=ruta))
+    return ruta
+
+
+def importar_paquete(ruta=None):
+    """El alumno importa un paquete: los radiales pasan a ser suyos y se aplican las opciones."""
+    from radial import paquete, pill_extra
+    if ruta is None:
+        rutas = cmds.fileDialog2(fileFilter=t("filtro_paquete"), fileMode=1, caption=t("menu_importar_paquete"),
+                                 okCaption=t("boton_importar"))
+        if not rutas:
+            return False
+        ruta = rutas[0]
+    try:
+        datos = paquete.leer(ruta)
+    except paquete.PaqueteNoValido as error:
+        cmds.warning(t("radial_no_valido", ruta=ruta, error=error))
+        return False
+    if not _descartar_cambios_si_hace_falta():
+        return False
+    forma_antes = (ajustes().forma, ajustes().pill_vertical)
+    for clave, valor in datos["opciones"].items():
+        setattr(ajustes(), clave, valor)
+    identificador, _, _ = rd.guardar_nuevo(datos["menu"], carpeta_mios(), datos["menu"]["nombre"])
+    biblioteca().usar("mio:" + identificador)
+    if datos["extra"] is not None:
+        extra = pill_extra.biblioteca()
+        if extra.sin_guardar:
+            extra.restaurar()
+        otro, _, _ = rd.guardar_nuevo(datos["extra"], carpeta_mios(), datos["extra"]["nombre"])
+        extra.usar("mio:" + otro)
+        pill_extra.refrescar()
+        pill_extra.activar(datos["extra_activa"])
+    ajustes().guardar()
+    _radial_cambiado()
+    _aplicar_opciones_vigentes(forma_antes)
+    print(t("paquete_importado", nombre=datos["nombre"]))
+    return True
+
+
 # --- Menú flotante ------------------------------------------------------------
 
 def _menu_flotante(crear=True):
@@ -517,6 +612,7 @@ def abrir_ajustes():
                              extra=_datos_extra(), al_extra=cambiar_extra,
                              cantidad=len(radial_activo()["botones"]), al_cantidad=cambiar_cantidad,
                              atajo=ajustes().atajo, al_atajo=cambiar_atajo)
+    ventana.fijar_bloqueadas(dict(ajustes().fijadas))
     _estado["ventana_ajustes"] = ventana
     if not visible():
         mostrar()
@@ -648,6 +744,12 @@ def cambiar_opcion(clave, valor):
     elif clave == "carpeta_clase":
         biblioteca()._activo = None  # se vuelve a leer: si era de clase y ya no está, se usa otro
         _radial_cambiado()
+        forma_antes = (ajustes().forma, ajustes().pill_vertical)
+        if cargar_fijadas():
+            _aplicar_opciones_vigentes(forma_antes)
+            ventana = _ventana("ventana_ajustes")
+            if ventana:
+                ventana.fijar_bloqueadas(dict(ajustes().fijadas))
 
 
 def _todos_los_radiales():
@@ -1029,6 +1131,9 @@ def _llenar_radiales(*_):
     cmds.menuItem(label=t("menu_importar"), command=lambda *_: importar())
     cmds.menuItem(label=t("menu_exportar"), command=lambda *_: exportar())
     cmds.menuItem(label=t("menu_exportar_bloqueado"), command=lambda *_: exportar_bloqueado())
+    cmds.menuItem(divider=True)
+    cmds.menuItem(label=t("menu_importar_paquete"), command=lambda *_: importar_paquete())
+    cmds.menuItem(label=t("menu_exportar_paquete"), command=lambda *_: exportar_paquete())
     cmds.menuItem(label=t("menu_gestionar"), command=lambda *_: abrir_gestor())
 
 
@@ -1041,6 +1146,7 @@ def _llenar_forma(*_):
                            ("forma_pill_vertical", "pill", True)):
         marcado = forma == f and (v is None or v == vertical)
         cmds.menuItem(label=t(etiqueta), radioButton=marcado,
+                      enable=not ({"forma", "pill_vertical"} & set(ajustes().fijadas)),
                       command=lambda *_, f=f, v=v: cambiar_forma(f, v))
 
 
@@ -1080,6 +1186,10 @@ def iniciar():
     """Lo llama el plugin al cargarse."""
     if cmds.about(batch=True):
         return
+    try:
+        cargar_fijadas()
+    except Exception as error:  # una carpeta de clase rota no impide que el plugin cargue
+        cmds.warning(str(error))
     crear_menu()
     _crear_comandos()
     # Con Maya ya abierto, no a mitad del arranque.

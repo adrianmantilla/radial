@@ -235,6 +235,10 @@ class VentanaAjustes(QtWidgets.QDialog):
         capa.addStretch(1)
         grupo = QtWidgets.QWidget()
         opciones_capa = QtWidgets.QVBoxLayout(grupo)
+        self.nota_fijadas = QtWidgets.QLabel("\U0001F512 " + t("ajustes_fijadas_nota"))
+        self.nota_fijadas.setWordWrap(True)
+        self.nota_fijadas.setVisible(False)
+        opciones_capa.addWidget(self.nota_fijadas)
         self.casillas = {}
         for clave in OPCIONES:
             casilla = QtWidgets.QCheckBox(t("ajustes_" + clave))
@@ -343,8 +347,44 @@ class VentanaAjustes(QtWidgets.QDialog):
                 widget.setEnabled(not pill)
         for widget in self._filas["pill_boton"]:
             widget.setEnabled(pill)
-        self.horizontal.setEnabled(pill)
-        self.vertical.setEnabled(pill)
+        bloqueadas = getattr(self, "bloqueadas", {})
+        self.horizontal.setEnabled(pill and "pill_vertical" not in bloqueadas)
+        self.vertical.setEnabled(pill and "pill_vertical" not in bloqueadas)
+
+    def fijar_bloqueadas(self, fijadas):
+        """Opciones que fija el profesor (carpeta de clase): se ven con su valor pero no se pueden cambiar."""
+        self.bloqueadas = dict(fijadas or {})
+        b = self.bloqueadas
+        controles = {
+            "forma": [self.forma_radial, self.forma_pill],
+            "ventana_ms": [self.velocidad],
+            "buscador": [self.buscador],
+        }
+        for clave, casilla in self.casillas.items():
+            controles[clave] = [casilla]
+        for clave, widgets in controles.items():
+            for widget in widgets:
+                widget.setEnabled(clave not in b)
+                widget.setToolTip(t("ajustes_fijada") if clave in b else "")
+        for clave, casilla in [("buscador", self.buscador)] + list(self.casillas.items()):
+            if clave in b:
+                casilla.blockSignals(True)
+                casilla.setChecked(bool(b[clave]))
+                casilla.blockSignals(False)
+        if "automatico" in b:
+            self.boton_reglas.setEnabled(bool(b["automatico"]))
+        if "ventana_ms" in b:
+            self.velocidad.fijar(dt.limitar_ventana(b["ventana_ms"]))
+        if "forma" in b or "pill_vertical" in b:
+            forma = b.get("forma", self.forma())
+            vertical = b.get("pill_vertical", self.vertical.isChecked())
+            for boton, valor in ((self.forma_radial, forma == "radial"), (self.forma_pill, forma == "pill"),
+                                 (self.horizontal, not vertical), (self.vertical, vertical)):
+                boton.blockSignals(True)
+                boton.setChecked(valor)
+                boton.blockSignals(False)
+        self.nota_fijadas.setVisible(bool(b))
+        self._mostrar_filas()
 
     def _apariencia_cambiada(self, clave, valor):
         self.apariencia[clave] = valor
