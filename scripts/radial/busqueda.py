@@ -1,11 +1,16 @@
 """Búsqueda de acciones para el buscador del menú (sin Maya ni Qt).
 
+Se busca a la vez en inglés (el nombre de Maya) y en español (la traducción).
+Además, cada palabra en español se prueba también en inglés con el glosario
+(«seleccionar» -> «select»), así se encuentran órdenes que no tienen traducción.
+
 Una acción es un diccionario con:
 
 - ``texto``: lo que se lee («Center Pivot»).
 - ``nombre``: el comando de Maya o el origen («CenterPivot»).
 - ``categoria``: dónde está en Maya («Modify», «Estante Poly»).
-- ``descripcion``: la ayuda del comando (también se busca en ella).
+- ``descripcion``: la ayuda del comando en el idioma del alumno si la hay (también se busca en ella).
+- ``descripcion_en``: la ayuda original de Maya en inglés cuando ``descripcion`` es la traducida.
 - ``traduccion``: su nombre en el idioma del alumno («Centrar pivote»), o "".
 - ``atajo``: su atajo de teclado («Ctrl+E»), o "".
 - ``boton``: el botón de radial que se ejecuta.
@@ -46,6 +51,7 @@ def accion_de_comando(nombre, categoria="", descripcion="", traduccion="", ayuda
         "nombre": nombre,
         "categoria": categoria_legible(categoria),
         "descripcion": ayuda or descripcion or "",
+        "descripcion_en": descripcion if ayuda else "",
         "traduccion": traduccion or "",
         "atajo": atajo or "",
         "boton": {"texto": texto_de_comando(nombre)[:40], "detalle": "", "icono": "", "tipo": "comando",
@@ -65,34 +71,90 @@ def accion_de_estante(estante, boton):
     }
 
 
+_SUFIJOS = ("Options", "Tool", "Context", "Ctx", "Window", "Editor")
+
+
+def candidatos_icono(nombre):
+    """Nombres de icono de Maya que probar para el comando ``nombre``, del más probable al menos.
+
+    «PolyExtrude» -> «polyExtrude.png», «polyExtrudeFacet.png»...; «CenterPivot» -> «centerPivot.png».
+    """
+    if not nombre:
+        return []
+    base = nombre
+    for sufijo in _SUFIJOS:
+        if base.endswith(sufijo) and len(base) > len(sufijo):
+            base = base[:-len(sufijo)]
+            break
+    minuscula = base[:1].lower() + base[1:]
+    candidatos = [minuscula, base]
+    if base.startswith("Poly"):
+        resto = base[4:]
+        candidatos += ["poly" + resto, "poly" + resto + "Facet", "poly" + resto + "Edge"]
+    elif base.startswith("Create"):
+        resto = base[6:]
+        candidatos += ["poly" + resto, resto[:1].lower() + resto[1:]]
+    vistos = []
+    for c in candidatos:
+        nombre_png = c + ".png"
+        if c and nombre_png not in vistos:
+            vistos.append(nombre_png)
+    return vistos
+
+
 def clave(accion):
     """Identifica una acción para la lista de recientes."""
     boton = accion["boton"]
     return "{}|{}".format(boton.get("tipo", ""), boton.get("accion", ""))
 
 
-def _puntos(accion, palabras):
-    """Menos es mejor. None si alguna palabra no está."""
+def alternativas(palabra, glosario):
+    """La palabra y sus equivalentes en inglés según el glosario (también si está a medio escribir)."""
+    resultado = [palabra]
+    if palabra in glosario:
+        resultado.append(sin_acentos(glosario[palabra]))
+    elif len(palabra) >= 4:
+        for clave in sorted(glosario):
+            if clave.startswith(palabra):
+                resultado.append(sin_acentos(glosario[clave]))
+                if len(resultado) > 3:
+                    break
+    return [r for i, r in enumerate(resultado) if r and r not in resultado[:i]]
+
+
+def _punto_palabra(palabra, nombres, palabras_nombres, nombre, resto):
+    if any(n.startswith(palabra) for n in nombres if n):
+        return 0
+    if any(p.startswith(palabra) for p in palabras_nombres):
+        return 1
+    if any(palabra in n for n in nombres) or palabra in nombre.replace(" ", ""):
+        return 3
+    if palabra in resto:
+        return 6
+    return None
+
+
+def _puntos(accion, palabras, glosario=None):
+    """Menos es mejor. None si alguna palabra no está (ni en inglés ni en español)."""
     nombres = [sin_acentos(accion["texto"]), sin_acentos(accion.get("traduccion", ""))]
     nombre = sin_acentos(accion["nombre"])
-    resto = sin_acentos(accion["categoria"] + " " + accion["descripcion"])
+    resto = sin_acentos(" ".join((accion["categoria"], accion["descripcion"], accion.get("descripcion_en", ""))))
     palabras_nombres = [p for n in nombres for p in n.split()]
     total = 0
     for palabra in palabras:
-        if any(n.startswith(palabra) for n in nombres if n):
-            total += 0
-        elif any(p.startswith(palabra) for p in palabras_nombres):
-            total += 1
-        elif any(palabra in n for n in nombres) or palabra in nombre:
-            total += 3
-        elif palabra in resto:
-            total += 6
-        else:
+        mejor = None
+        for i, alternativa in enumerate(alternativas(palabra, glosario or {})):
+            puntos = _punto_palabra(alternativa, nombres, palabras_nombres, nombre, resto)
+            if puntos is not None:
+                puntos += 1 if i else 0  # lo traducido con el glosario, un poco detrás
+                mejor = puntos if mejor is None else min(mejor, puntos)
+        if mejor is None:
             return None
+        total += mejor
     return total
 
 
-def buscar(acciones, consulta, recientes=(), limite=MAX_RESULTADOS):
+def buscar(acciones, consulta, recientes=(), limite=MAX_RESULTADOS, glosario=None):
     """Las acciones que coinciden con ``consulta``, las mejores primero.
 
     Todas las palabras de la consulta tienen que aparecer, en cualquier orden.
@@ -101,11 +163,14 @@ def buscar(acciones, consulta, recientes=(), limite=MAX_RESULTADOS):
     palabras = sin_acentos(consulta).split()
     if not palabras:
         return []
+    if glosario is None:
+        from radial.i18n import glosario as cargar_glosario
+        glosario = cargar_glosario()
     recientes = list(recientes)
     encontradas = []
     vistas = set()
     for orden, accion in enumerate(acciones):
-        puntos = _puntos(accion, palabras)
+        puntos = _puntos(accion, palabras, glosario)
         if puntos is None:
             continue
         k = clave(accion)
@@ -123,8 +188,8 @@ def anadir_reciente(recientes, accion, limite=MAX_RECIENTES):
     """Pone ``accion`` la primera de ``recientes`` (lista de acciones) sin repetirla."""
     k = clave(accion)
     resto = [a for a in recientes if isinstance(a, dict) and "boton" in a and clave(a) != k]
-    guardada = {c: accion.get(c, "") for c in ("texto", "nombre", "categoria", "descripcion", "traduccion",
-                                                 "atajo")}
+    guardada = {c: accion.get(c, "") for c in ("texto", "nombre", "categoria", "descripcion", "descripcion_en",
+                                                 "traduccion", "atajo")}
     guardada["boton"] = dict(accion["boton"])
     return [guardada] + resto[:limite - 1]
 

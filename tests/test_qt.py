@@ -24,7 +24,7 @@ if QtWidgets is not None:
     from radial.configurador import TIPOS_PAGINA, Configurador
     from radial.ventana_ajustes import DialogoReglas, VentanaAjustes
     from radial import ayuda, interruptores
-    from radial.buscador import Buscador
+    from radial.buscador import Buscador, ListaResultados as ListaResultadosPrueba
     from radial import arrastre, busqueda
 
     Qt = QtCore.Qt
@@ -704,6 +704,26 @@ class PruebaAyuda(unittest.TestCase):
         self.assertFalse(tarjeta.grab().isNull())
         tarjeta.ocultar()
         self.assertFalse(tarjeta.isVisible())
+
+
+
+@unittest.skipIf(QtWidgets is None, "PySide6 no está instalado")
+class PruebaIconosBuscador(unittest.TestCase):
+    def test_icono_de_la_herramienta(self):
+        pedidos = []
+        lista = ListaResultadosPrueba(lambda accion: None)
+        lista.buscar_icono = lambda nombre: pedidos.append(nombre) or ":/noExiste.png"
+        self.addCleanup(lista.close)
+        acciones = [busqueda.accion_de_comando("PolyExtrude"), busqueda.accion_de_comando("SelectAll")]
+        lista.fijar(acciones, "poly")
+        lista.setFixedWidth(360)
+        lista.show()
+        self.assertFalse(lista.grab().isNull())  # sin icono de verdad dibuja la inicial
+        self.assertIn("PolyExtrude", pedidos)
+        self.assertEqual(lista.icono_de(acciones[0]), ":/noExiste.png")
+        estante = busqueda.accion_de_estante("Poly", {"texto": "Cubo", "icono": "cubo", "tipo": "mel",
+                                                      "accion": "polyCube;"})
+        self.assertEqual(lista.icono_de(estante), "cubo")
 
 
 if __name__ == "__main__":

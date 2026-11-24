@@ -72,5 +72,42 @@ class PruebaBusqueda(unittest.TestCase):
         self.assertEqual(bq.partes_resaltadas("Cubo", ""), [("Cubo", False)])
 
 
+class PruebaIdiomas(unittest.TestCase):
+    ACCIONES = [
+        bq.accion_de_comando("PolyExtrude", "Menu items.Edit Mesh", "Extrude faces", "Extruir", "Saca caras."),
+        bq.accion_de_comando("SelectAll", "Menu items.Select", "Select all objects"),
+        bq.accion_de_comando("BevelPolygon", "Menu items.Edit Mesh", "Bevel edges", "Biselar", ""),
+        bq.accion_de_comando("UVEditor", "Menu items.UV", "Open the UV editor"),
+    ]
+
+    def nombres(self, consulta):
+        return [a["nombre"] for a in bq.buscar(self.ACCIONES, consulta)]
+
+    def test_ingles_y_espanol(self):
+        self.assertEqual(self.nombres("extrude")[0], "PolyExtrude")
+        self.assertEqual(self.nombres("extruir")[0], "PolyExtrude")
+        self.assertEqual(self.nombres("bevel")[0], "BevelPolygon")
+        self.assertEqual(self.nombres("biselar")[0], "BevelPolygon")
+
+    def test_glosario_para_lo_que_no_esta_traducido(self):
+        self.assertEqual(self.nombres("seleccionar todo"), ["SelectAll"])
+        self.assertEqual(self.nombres("editor uv")[0], "UVEditor")
+        self.assertIn("SelectAll", self.nombres("selecc"))  # a medio escribir
+
+    def test_se_busca_en_la_ayuda_inglesa_aunque_haya_traduccion(self):
+        self.assertIn("PolyExtrude", self.nombres("faces"))
+        self.assertIn("PolyExtrude", self.nombres("caras"))
+
+    def test_alternativas(self):
+        self.assertEqual(bq.alternativas("extruir", {"extruir": "extrude"}), ["extruir", "extrude"])
+        self.assertEqual(bq.alternativas("xyz", {"extruir": "extrude"}), ["xyz"])
+
+    def test_candidatos_icono(self):
+        self.assertEqual(bq.candidatos_icono("CenterPivot")[0], "centerPivot.png")
+        self.assertIn("polyExtrudeFacet.png", bq.candidatos_icono("PolyExtrude"))
+        self.assertEqual(bq.candidatos_icono("PolyBevelOptions")[0], "polyBevel.png")
+        self.assertEqual(bq.candidatos_icono(""), [])
+
+
 if __name__ == "__main__":
     unittest.main()

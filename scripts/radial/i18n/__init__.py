@@ -62,3 +62,24 @@ def sinonimos(idioma=None):
             datos = {}
         _sinonimos[idioma] = {k: v for k, v in datos.items() if isinstance(v, dict)}
     return _sinonimos[idioma]
+
+
+_glosarios = {}
+
+
+def glosario(idioma=None):
+    """Palabras del idioma del alumno con su equivalente en inglés, para buscar órdenes de Maya.
+
+    ``{"extruir": "extrude", "seleccionar": "select"}`` (claves sin tildes, en minúsculas).
+    Está en ``glosario_<idioma>.json``.
+    """
+    idioma = idioma or _idioma
+    if idioma not in _glosarios:
+        ruta = os.path.join(_CARPETA, "glosario_{}.json".format(idioma))
+        try:
+            with open(ruta, encoding="utf-8") as f:
+                datos = json.load(f)
+        except (OSError, ValueError):
+            datos = {}
+        _glosarios[idioma] = {k: v for k, v in datos.items() if isinstance(k, str) and isinstance(v, str)}
+    return _glosarios[idioma]

@@ -12,6 +12,7 @@ from maya import cmds, mel
 class FuentesMaya(object):
     def __init__(self):
         self._comandos = None
+        self._iconos_comando = {}
 
     def comandos(self):
         """Lista de (nombre, categoría, descripción) de los comandos del Editor de atajos."""
@@ -91,6 +92,31 @@ class FuentesMaya(object):
         nombres = cmds.resourceManager(nameFilter=patron) or []
         nombres = sorted(n for n in nombres if not n.endswith("_150.png") and not n.endswith("_200.png"))
         return [":/" + n for n in nombres[:limite]]
+
+    def icono_de_comando(self, nombre):
+        """El icono de Maya de la herramienta ``nombre`` (``":/polyBevel.png"``) o "" si no tiene."""
+        if nombre in self._iconos_comando:
+            return self._iconos_comando[nombre]
+        from radial import busqueda
+        icono = ""
+        try:
+            imagen = cmds.runTimeCommand(nombre, query=True, image=True) or ""
+        except (RuntimeError, TypeError):
+            imagen = ""
+        candidatos = ([imagen] if imagen else []) + busqueda.candidatos_icono(nombre)
+        for candidato in candidatos:
+            if os.path.isabs(candidato) and os.path.isfile(candidato):
+                icono = candidato
+                break
+            nombre_png = candidato.lstrip(":/")
+            try:
+                if cmds.resourceManager(nameFilter=nombre_png):
+                    icono = ":/" + nombre_png
+                    break
+            except RuntimeError:
+                continue
+        self._iconos_comando[nombre] = icono
+        return icono
 
     def probar(self, boton):
         from radial import acciones

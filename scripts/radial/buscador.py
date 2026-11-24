@@ -8,7 +8,7 @@ un botón del menú para asignárselo.
 El buscador sigue al menú: se mueve, se muestra y se oculta con él.
 """
 
-from radial import busqueda
+from radial import busqueda, iconos
 from radial.arrastre import datos_mime
 from radial.dibujo import COLOR_BORDE_FONDO, COLOR_DETALLE, COLOR_TEXTO, pixmap_icono
 from radial.i18n import t
@@ -62,6 +62,8 @@ class ListaResultados(QtWidgets.QWidget):
         self._pulsada = None
         self._inicio_arrastre = None
         self._iconos = {}
+        # funcion(nombre del comando) -> icono de Maya (":/polyBevel.png") o "" (la pone quien crea el buscador)
+        self.buscar_icono = None
 
     def fijar(self, acciones, consulta, titulo="", vacio=""):
         self.acciones = list(acciones)
@@ -103,7 +105,7 @@ class ListaResultados(QtWidgets.QWidget):
             self._pulsada = None
             arrastre = QtGui.QDrag(self)
             arrastre.setMimeData(datos_mime(accion["boton"]))
-            mapa = self._icono(accion, 18)
+            mapa = self._icono(accion, 18)[0]
             if mapa is not None:
                 arrastre.setPixmap(mapa)
             arrastre.exec(Qt.CopyAction)
@@ -128,15 +130,25 @@ class ListaResultados(QtWidgets.QWidget):
 
     # --- Dibujo ---------------------------------------------------------------
 
+    def icono_de(self, accion):
+        """El icono de la herramienta: el del botón, el de Maya para ese comando o "" si no tiene."""
+        icono = accion["boton"].get("icono", "")
+        if not icono and accion["boton"].get("tipo") == "comando" and self.buscar_icono is not None:
+            try:
+                icono = self.buscar_icono(accion["nombre"]) or ""
+            except Exception:  # sin icono la fila se ve igual de bien
+                icono = ""
+        return icono
+
     def _icono(self, accion, lado):
-        icono = accion["boton"].get("icono") or ("estante" if accion["boton"].get("tipo") != "comando"
-                                                 else "rayo")
+        """(pixmap o None, True si es un icono de Maya a color que no se recolorea)."""
+        icono = self.icono_de(accion)
+        propio = iconos.es_imagen(icono)
         escala = self.devicePixelRatioF()
         clave = (icono, lado, escala)
         if clave not in self._iconos:
-            self._iconos[clave] = (pixmap_icono(icono, lado, escala, "#ececec")
-                                   or pixmap_icono("rayo", lado, escala, "#ececec"))
-        return self._iconos[clave]
+            self._iconos[clave] = pixmap_icono(icono, lado, escala, "#ececec") if icono else None
+        return self._iconos[clave], propio
 
     def paintEvent(self, evento):
         pintor = QtGui.QPainter(self)
@@ -186,12 +198,24 @@ class ListaResultados(QtWidgets.QWidget):
             pintor.setPen(Qt.NoPen)
             pintor.setBrush(QtGui.QColor(0, 0, 0, 30) if elegida else COLOR_CIRCULO)
             pintor.drawEllipse(centro, 12, 12)
-            mapa = self._icono(accion, 14)
-            if mapa is not None:
+            mapa, propio = self._icono(accion, 20 if iconos.es_imagen(self.icono_de(accion)) else 14)
+            if mapa is not None and propio:
+                # Icono de Maya a color, tal cual
+                pintor.drawPixmap(QtCore.QRectF(centro.x() - 10, centro.y() - 10, 20, 20), mapa,
+                                  QtCore.QRectF(mapa.rect()))
+            elif mapa is not None:
                 if elegida:
                     mapa = self._oscurecer(mapa)
                 pintor.drawPixmap(QtCore.QRectF(centro.x() - 7, centro.y() - 7, 14, 14), mapa,
                                   QtCore.QRectF(mapa.rect()))
+            else:
+                # Sin icono: la inicial de la herramienta
+                inicial = QtGui.QFont(negrita)
+                inicial.setPixelSize(12)
+                pintor.setFont(inicial)
+                pintor.setPen(COLOR_TEXTO_ELEGIDO if elegida else COLOR_DETALLE)
+                pintor.drawText(QtCore.QRectF(centro.x() - 12, centro.y() - 12, 24, 24), Qt.AlignCenter,
+                                (accion["texto"] or "?")[:1].upper())
             # Texto con lo buscado en negrita
             x = fila.left() + 40
             pintor.setPen(COLOR_TEXTO_ELEGIDO if elegida else COLOR_TEXTO)
@@ -240,7 +264,7 @@ class Buscador(QtWidgets.QWidget):
     - ``al_terminar()``: se ejecutó o se pulsó Esc; devuelve el teclado a Maya.
     """
 
-    def __init__(self, acciones, al_ejecutar, recientes=None, al_terminar=None, padre=None):
+    def __init__(self, acciones, al_ejecutar, recientes=None, al_terminar=None, padre=None, buscar_icono=None):
         super(Buscador, self).__init__(padre)
         _ventana_flotante(self, acepta_foco=True)
         self.setObjectName("RadialBuscador")
@@ -271,6 +295,7 @@ class Buscador(QtWidgets.QWidget):
         self._lupa = None
 
         self.lista = ListaResultados(self.ejecutar, padre)
+        self.lista.buscar_icono = buscar_icono
 
     # --- Seguir al menú -------------------------------------------------------
 

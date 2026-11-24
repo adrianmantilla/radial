@@ -21,7 +21,7 @@ COMANDO_CONFIGURAR = "RadialConfigurar"
 
 _estado = {"menu": None, "filtro": None, "ajustes": None, "biblioteca": None,
            "configurador": None, "ventana_ajustes": None, "gestor": None, "buscador": None,
-           "tarjeta": None, "reloj_automatico": None, "contexto": None}
+           "tarjeta": None, "reloj_automatico": None, "contexto": None, "fuentes": None}
 
 
 # --- Ajustes y biblioteca -------------------------------------------------------
@@ -124,18 +124,30 @@ def guardar():
     return True
 
 
-def guardar_como():
-    base = _nombre_activo()
-    if biblioteca().es_preconfigurado:
-        base = t("nombre_mi_radial", nombre=base)
+def _pedir_nombre(base):
+    """Pregunta el nombre del radial nuevo. None si se cancela."""
     respuesta = cmds.promptDialog(title=t("guardar_como_titulo"), message=t("gestor_nombre"),
                                   text=rd.nombre_libre(carpeta_mios(), base),
                                   button=[t("boton_guardar"), t("boton_cancelar")],
                                   defaultButton=t("boton_guardar"), cancelButton=t("boton_cancelar"),
                                   dismissString=t("boton_cancelar"))
     if respuesta != t("boton_guardar"):
-        return False
-    nombre = cmds.promptDialog(query=True, text=True).strip()
+        return None
+    return cmds.promptDialog(query=True, text=True).strip() or None
+
+
+def _biblioteca_cambiada():
+    """Se guardó un radial nuevo (desde la pill extra): el gestor lo enseña."""
+    gestor = _ventana("gestor")
+    if gestor:
+        gestor.refrescar()
+
+
+def guardar_como():
+    base = _nombre_activo()
+    if biblioteca().es_preconfigurado:
+        base = t("nombre_mi_radial", nombre=base)
+    nombre = _pedir_nombre(base)
     if not nombre:
         return False
     nuevo = biblioteca().guardar_como(nombre)
@@ -333,6 +345,8 @@ def _tiene_opciones(boton):
 
 def _actualizar_estados():
     """Marca los interruptores encendidos. Se llama al mostrar el menú y tras cada clic."""
+    from radial import pill_extra
+    pill_extra.actualizar_estados()
     menu = _menu_flotante(crear=False)
     if not menu or not menu.isVisible():
         return
@@ -365,15 +379,25 @@ def _buscador():
     if not sigue_vivo(buscador):
         from radial.buscador import Buscador
         buscador = Buscador(_acciones_buscador, _al_buscar, recientes=lambda: ajustes().recientes,
-                            al_terminar=_devolver_foco, padre=ventana_maya())
+                            al_terminar=_devolver_foco, padre=ventana_maya(), buscar_icono=_icono_de_comando)
         _estado["buscador"] = buscador
     return buscador
 
 
+def _fuentes():
+    if _estado.get("fuentes") is None:
+        from radial.fuentes_maya import FuentesMaya
+        _estado["fuentes"] = FuentesMaya()
+    return _estado["fuentes"]
+
+
+def _icono_de_comando(nombre):
+    return _fuentes().icono_de_comando(nombre)
+
+
 def _acciones_buscador():
     from radial import busqueda
-    from radial.fuentes_maya import FuentesMaya
-    fuentes = FuentesMaya()
+    fuentes = _fuentes()
     traducciones = sinonimos()
     try:
         atajos = fuentes.atajos()
@@ -471,11 +495,37 @@ def abrir_ajustes():
                              ajustes().ventana_ms, al_apariencia=_apariencia_cambiada,
                              al_forma=cambiar_forma, al_velocidad=_velocidad_cambiada, padre=ventana_maya(),
                              buscador=ajustes().buscador, al_buscador=cambiar_buscador,
-                             opciones=_opciones(), al_opcion=cambiar_opcion, al_reglas=abrir_reglas)
+                             opciones=_opciones(), al_opcion=cambiar_opcion, al_reglas=abrir_reglas,
+                             extra=_datos_extra(), al_extra=cambiar_extra)
     _estado["ventana_ajustes"] = ventana
     if not visible():
         mostrar()
     return _traer(ventana)
+
+
+def _datos_extra():
+    from radial import pill_extra
+    return {"activa": pill_extra.ajustes().activa, "vertical": pill_extra.ajustes().vertical,
+            "radial": pill_extra.biblioteca().origen, "apariencia": pill_extra.biblioteca().activo["apariencia"],
+            "radiales": _todos_los_radiales()}
+
+
+def cambiar_extra(clave, valor=None):
+    """La pill extra desde Ajustes: activa, radial, vertical, apariencia o configurar."""
+    from radial import pill_extra
+    if clave == "activa":
+        pill_extra.activar(valor)
+    elif clave == "radial":
+        pill_extra.usar_radial(valor)
+    elif clave == "vertical":
+        pill_extra.cambiar_vertical(valor)
+    elif clave == "apariencia":
+        pill_extra.cambiar_apariencia(valor)
+    elif clave == "configurar":
+        pill_extra.abrir_configurador()
+    ventana = _ventana("ventana_ajustes")
+    if ventana and clave in ("radial", "configurar"):
+        ventana.fijar_extra(_datos_extra())
 
 
 def _opciones():
@@ -489,6 +539,8 @@ def cambiar_opcion(clave, valor):
     setattr(ajustes(), clave, valor)
     ajustes().guardar()
     if clave == "carpetas":
+        from radial import pill_extra
+        pill_extra.fijar_carpetas(valor)
         configurador = _ventana("configurador")
         if configurador:
             configurador.carpetas = bool(valor)
@@ -605,7 +657,8 @@ def _info_de(boton):
     return {}
 
 
-def _al_sobre(boton):
+def _al_sobre(boton, menu=None):
+    """Modo aprendizaje: el ratón está sobre ``boton`` de ``menu`` (el principal si no se dice)."""
     if not boton or not ajustes().aprendizaje:
         _ocultar_tarjeta()
         return
@@ -615,7 +668,7 @@ def _al_sobre(boton):
         datos = contenido(boton, _info_de(boton), acciones.estado(boton), _tiene_opciones(boton))
     except Exception:  # la ayuda nunca debe romper el menú
         return
-    menu = _menu_flotante(crear=False)
+    menu = menu if menu is not None else _menu_flotante(crear=False)
     if menu:
         _tarjeta().mostrar(datos, menu)
 
@@ -852,6 +905,10 @@ def crear_menu():
     cmds.menuItem(MENU_FORMA, label=t("menu_forma"), subMenu=True, postMenuCommand=_llenar_forma)
     cmds.setParent("..", menu=True)
     cmds.menuItem(label=t("menu_ajustes"), command=lambda *_: abrir_ajustes())
+    from radial import pill_extra
+    cmds.menuItem(pill_extra.MENU_ACTIVA, label=t("menu_pill_extra"), checkBox=pill_extra.ajustes().activa,
+                  command=lambda activa, *_: pill_extra.activar(bool(activa)))
+    cmds.menuItem(label=t("menu_pill_extra_configurar"), command=lambda *_: pill_extra.abrir_configurador())
     cmds.menuItem(label=t("menu_centrar"), command=lambda *_: volver_a_centrar())
     cmds.menuItem(divider=True)
     cmds.menuItem(label=t("menu_comprobar"), command=lambda *_: comprobar())
@@ -875,15 +932,26 @@ def iniciar():
     _crear_comandos()
     # Con Maya ya abierto, no a mitad del arranque.
     QtCore.QTimer.singleShot(2000, _instalar_filtro)
+    QtCore.QTimer.singleShot(2500, _iniciar_extra)
     print(t("iniciado", version=radial.__version__))
+
+
+def _iniciar_extra():
+    from radial import pill_extra
+    try:
+        pill_extra.iniciar()
+    except Exception as error:  # la pill extra nunca debe impedir que Maya arranque
+        cmds.warning(t("extra_error", error=error))
 
 
 def detener():
     """Lo llama el plugin al descargarse: quita el filtro, las ventanas y los menús."""
+    from radial import pill_extra
+    pill_extra.detener()
     _quitar_filtro()
     _cerrar_ventanas()
     _destruir_menu_flotante()
     _destruir_buscador()
-    _estado.update(ajustes=None, biblioteca=None)
+    _estado.update(ajustes=None, biblioteca=None, fuentes=None)
     if not cmds.about(batch=True):
         quitar_menu()

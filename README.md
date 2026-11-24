@@ -13,7 +13,7 @@ Cada botón lanza la orden de Maya que tú elijas.
 - Se guarda, se exporta y se comparte como un archivo `.radial`.
 - No cambia ningún atajo de Maya.
 
-No necesita instalar nada más: funciona con el Python que trae Maya. Versión **1.1.0**.
+No necesita instalar nada más: funciona con el Python que trae Maya. Versión **1.2.0**.
 
 > *English summary:* Radial is a floating six-button menu for Maya 2026/2027 (Windows and macOS). Hover a
 > viewport and press **Tab twice quickly** to show or hide it. Buttons can run any Maya command, a shelf
@@ -68,9 +68,12 @@ Debajo del radial y de la pill hay una barra **Buscar acción…**. Haz clic en 
 nombre del comando. Las palabras pueden ir en cualquier orden («uv editor» o «editor uv») y no importan
 las tildes ni las mayúsculas. Antes de escribir enseña las últimas que has usado.
 
-También entiende español: «centrar pivote», «biselar» o «congelar» encuentran `CenterPivot`, `BevelPolygon`
-y `FreezeTransformations`. Cada resultado enseña el nombre de Maya en inglés (el de los menús y los
-tutoriales) con el nombre en español debajo, y a la derecha su atajo de teclado si tiene.
+Busca a la vez en **inglés y en español**: «extrude» y «extruir» encuentran lo mismo, y «centrar pivote»,
+«biselar» o «congelar» encuentran `CenterPivot`, `BevelPolygon` y `FreezeTransformations`. Las órdenes que
+no tienen traducción también salen en español gracias a un glosario de palabras
+(`i18n/glosario_es.json`: «seleccionar todo» encuentra `SelectAll`). Cada resultado lleva el **icono de la
+herramienta en Maya** (o la inicial si Maya no tiene icono para ella), el nombre de Maya en inglés con el
+español debajo, y a la derecha su atajo de teclado si tiene.
 
 - **↑ ↓** para elegir, **Intro** o clic para ejecutar. Con **Mayús** (Mayús + Intro o Mayús + clic) se
   abre su ventana de opciones. **Esc** borra y devuelve el teclado a Maya.
@@ -99,6 +102,16 @@ Imán a vértices, Rejilla y Simetría. En **Código Python** puedes hacer los t
 | Carpetas | Desactivado | Permite que un botón sea una **carpeta** con otros seis botones. En el menú, al pulsarla se ven sus botones; un clic en el centro (o en el agarre de la pill) vuelve |
 | Radial automático | Desactivado | Cambia de radial solo según el workspace de Maya (Modeling, UV Editing, Animation, Rendering...) y el modo de selección (objeto, vértices, aristas, caras, UV). El modo de selección manda. Se configura en **Reglas…**. Si eliges otro radial a mano se respeta hasta que cambies de workspace o de modo, y nunca cambia si hay cambios sin guardar |
 | Carpeta de clase | Ninguna | Ver abajo |
+
+## Pill extra
+
+En **Radial > Ajustes > Pill extra** (o **Radial > Pill extra**) se activa una **segunda pill flotante**,
+independiente del menú del doble Tab: está siempre a la vista mientras la tengas activa y vuelve a salir
+al abrir Maya. Tiene todo lo suyo: su radial de botones (cualquiera de la biblioteca), iconos, carpetas,
+interruptores, tamaño de los botones, opacidad, orientación (horizontal o vertical) y su sitio en la
+pantalla. Se mueve arrastrando los puntitos del extremo y **clic derecho** en ellos abre su configurador
+(también **Radial > Configurar la pill extra…**). Lo que guardas desde ella se guarda en **Mis radiales**,
+así que puedes usar el mismo juego en el menú y en la pill extra.
 
 ## Modo clase
 

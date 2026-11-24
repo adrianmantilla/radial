@@ -137,6 +137,38 @@ class PruebaOpciones(unittest.TestCase):
             self.assertEqual(b.reglas, {"sel:uv": "pre:2_uv_texturas"})
 
 
+class PruebaAjustesExtra(unittest.TestCase):
+    def test_radial_propio_e_independiente(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = aj.Ajustes(tmp)
+            extra = aj.AjustesExtra(base)
+            self.assertFalse(extra.activa)
+            principal = Biblioteca(base, os.path.join(tmp, "radiales"))
+            otra = Biblioteca(extra, os.path.join(tmp, "radiales"))
+            otra.usar("pre:3_animacion")
+            extra.activa, extra.vertical, extra.posicion = True, True, (10, 20)
+            radial = otra.activo
+            radial["botones"][0]["texto"] = "Solo en la extra"
+            otra.modificar(radial)
+            self.assertEqual(principal.origen, "pre:1_modelado")
+            self.assertFalse(principal.sin_guardar)
+            nueva = aj.AjustesExtra(aj.Ajustes(tmp))
+            self.assertEqual((nueva.activa, nueva.vertical, nueva.posicion), (True, True, (10, 20)))
+            self.assertEqual(Biblioteca(nueva, os.path.join(tmp, "radiales")).activo["botones"][0]["texto"],
+                             "Solo en la extra")
+
+
+class PruebaGlosario(unittest.TestCase):
+    def test_formato(self):
+        from radial.busqueda import sin_acentos
+        from radial.i18n import glosario
+        datos = glosario("es")
+        self.assertGreater(len(datos), 200)
+        for clave, valor in datos.items():
+            self.assertEqual(clave, sin_acentos(clave))
+            self.assertTrue(valor)
+
+
 class PruebaSinonimos(unittest.TestCase):
     def test_formato(self):
         datos = sinonimos("es")

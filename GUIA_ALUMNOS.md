@@ -23,7 +23,7 @@ Si no se abre, prueba a pulsar más rápido. También puedes usar **Radial > Mos
 
 Debajo del menú tienes el **buscador**: haz clic, escribe lo que buscas (por ejemplo «extrude») y elige
 con las flechas e Intro o con un clic. **Esc** para salir. Si arrastras un resultado hasta un punto del
-menú, ese botón pasa a hacer esa orden. Puedes buscar en español («centrar pivote», «biselar»): verás el
+menú, ese botón pasa a hacer esa orden. Puedes buscar en inglés o en español («extrude» o «extruir», «centrar pivote»): verás el
 nombre de Maya en inglés y debajo el español, para que aprendas los dos.
 
 - **Mayús + clic** en un botón (o Mayús + Intro en el buscador) abre la ventana de opciones de esa orden.
@@ -55,6 +55,9 @@ Clic derecho en el centro del menú (o **Radial > Configurar botones**).
 
 **Radial > Ajustes**: radio del anillo, tamaño de los puntos, opacidad y velocidad del doble Tab.
 En **Forma** puedes cambiar el anillo por una **pill** (una barra con los botones en fila).
+
+En la pestaña **Pill extra** puedes sacar una **segunda pill** siempre a la vista, con sus propios
+botones (por ejemplo, tus favoritos). Clic derecho en sus puntitos para cambiar sus botones.
 
 En **Opciones** puedes activar las **Carpetas** (un botón que guarda otros seis) y el **Radial
 automático** (cambia solo de radial cuando pasas de modelar a UV, animación o render).

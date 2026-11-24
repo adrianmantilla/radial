@@ -174,5 +174,16 @@
   "aprendizaje_interruptor": "Interruptor: ahora está {estado}",
   "aprendizaje_encendido": "encendido",
   "aprendizaje_apagado": "apagado",
-  "menu_clase_vacia": "La carpeta de clase no tiene radiales"
+  "menu_clase_vacia": "La carpeta de clase no tiene radiales",
+  "ajustes_extra": "Pill extra",
+  "ajustes_extra_casilla": "Mostrar otra pill flotante, independiente del menú",
+  "ajustes_extra_ayuda": "Siempre a la vista (no se abre con el doble Tab), con sus propios botones, tamaño y orientación. Se mueve desde los puntitos; clic derecho en ellos para configurarla.",
+  "ajustes_extra_radial": "Botones de",
+  "ajustes_extra_configurar": "Configurar sus botones...",
+  "extra_cabecera": "Pill extra · {nombre}",
+  "extra_config_titulo": "Radial · Botones de la pill extra",
+  "extra_error": "Radial: no se pudo mostrar la pill extra ({error}).",
+  "menu_pill_extra": "Pill extra",
+  "menu_pill_extra_configurar": "Configurar la pill extra...",
+  "ajustes_pestana_menu": "Menú"
 }

@@ -1,4 +1,4 @@
-"""Prueba de Radial 1.1 dentro de Maya, sin interfaz (herramienta de desarrollo).
+"""Prueba de Radial 1.2 dentro de Maya, sin interfaz (herramienta de desarrollo).
 
 Desde la terminal, con el mayapy de cada versión:
 
@@ -91,6 +91,13 @@ def main():
               "los comandos traducidos existen ({} de {})".format(len(traducidos) - len(faltan), len(traducidos)))
     if faltan:
         print("        no existen: " + ", ".join(faltan))
+    muestra = ["PolyExtrude", "CenterPivot", "BevelPolygon", "UVEditor", "Hypershade", "CreatePolygonCube",
+               "FreezeTransformations", "MultiCutTool", "DeleteHistory", "RenderViewWindow"]
+    con_icono = {n: fuentes.icono_de_comando(n) for n in muestra}
+    comprobar(sum(1 for v in con_icono.values() if v) >= len(muestra) // 2,
+              "el buscador encuentra iconos de Maya ({} de {})".format(sum(1 for v in con_icono.values() if v),
+                                                                     len(muestra)))
+    print("        iconos: " + ", ".join("{}={}".format(k, v or "-") for k, v in con_icono.items()))
     atajos = fuentes.atajos()
     comprobar(isinstance(atajos, dict), "los atajos de teclado se leen ({})".format(len(atajos)))
     comprobar(acc.comando_de_opciones({"tipo": "comando", "accion": "DuplicateSpecial"}) is not None,

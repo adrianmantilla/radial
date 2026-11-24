@@ -193,3 +193,49 @@ class Ajustes(object):
     @aprendizaje.setter
     def aprendizaje(self, valor):
         self.datos["aprendizaje"] = bool(valor)
+
+
+class AjustesExtra(object):
+    """Los ajustes de la pill extra: otra pill flotante, independiente del menú del doble Tab.
+
+    Tiene su propio radial (botones, tamaño y opacidad), su orientación y su sitio. Se guarda dentro
+    de ``ajustes.json`` en ``"extra"``. Ofrece lo mismo que ``Ajustes`` necesita ``Biblioteca``.
+    """
+
+    def __init__(self, ajustes):
+        self.base = ajustes
+
+    @property
+    def datos(self):
+        extra = self.base.datos.get("extra")
+        if not isinstance(extra, dict):
+            extra = self.base.datos["extra"] = {}
+        return extra
+
+    def guardar(self):
+        self.base.guardar()
+
+    @property
+    def carpeta_clase(self):
+        return self.base.carpeta_clase
+
+    @property
+    def activa(self):
+        return self.datos.get("activa") is True
+
+    @activa.setter
+    def activa(self, valor):
+        self.datos["activa"] = bool(valor)
+
+    @property
+    def vertical(self):
+        return self.datos.get("vertical") is True
+
+    @vertical.setter
+    def vertical(self, valor):
+        self.datos["vertical"] = bool(valor)
+
+    posicion = Ajustes.posicion
+    radial_activo = Ajustes.radial_activo
+    radial_actual = Ajustes.radial_actual
+    sin_guardar = Ajustes.sin_guardar

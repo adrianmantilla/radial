@@ -52,9 +52,11 @@ class PruebaInterfaz(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.modulos = mock.patch.dict(sys.modules, _maya_falso(self.tmp.name))
         self.modulos.start()
-        for nombre in [m for m in sys.modules if m in ("radial.interfaz_maya", "radial.acciones",
-                                                       "radial.fuentes_maya")]:
-            del sys.modules[nombre]
+        for nombre in ("interfaz_maya", "acciones", "fuentes_maya", "pill_extra"):
+            sys.modules.pop("radial." + nombre, None)
+            # «from radial import x» mira primero el atributo del paquete: también fuera.
+            if hasattr(sys.modules["radial"], nombre):
+                delattr(sys.modules["radial"], nombre)
         # import_module y no «from radial import ...»: este reutilizaría el módulo de la prueba anterior.
         self.im = importlib.import_module("radial.interfaz_maya")
         self.cmds = sys.modules["maya.cmds"]
@@ -244,6 +246,75 @@ class PruebaInterfaz(unittest.TestCase):
         self.im.cambiar_opcion("aprendizaje", False)
         self.im._al_sobre(menu.botones_visibles()[0])
         self.assertIsNone(tarjeta.datos)
+
+    def _extra(self):
+        return importlib.import_module("radial.pill_extra")
+
+    def test_pill_extra_independiente(self):
+        self.im.cambiar_extra("activa", True)
+        extra = self._extra()
+        self.assertTrue(extra.visible())
+        self.assertFalse(self.im.visible())  # el menú del doble Tab sigue a lo suyo
+        self.im.alternar()
+        self.assertTrue(self.im.visible() and extra.visible())
+        self.im.alternar()
+        self.assertTrue(extra.visible())
+        # Su propio radial, sin tocar el del menú
+        self.im.cambiar_extra("radial", "pre:3_animacion")
+        self.assertEqual(extra.biblioteca().origen, "pre:3_animacion")
+        self.assertEqual(self.im.biblioteca().origen, "pre:1_modelado")
+        self.im.cambiar_extra("apariencia", {"pill_boton": 40, "opacidad": 0.5})
+        self.assertEqual(extra.pill(crear=False).apariencia["pill_boton"], 40)
+        self.assertNotEqual(self.im.radial_activo()["apariencia"]["opacidad"], 0.5)
+        self.im.cambiar_extra("vertical", True)
+        menu = extra.pill(crear=False)
+        self.assertTrue(menu.vertical)
+        self.assertGreater(menu.height(), menu.width())
+        # Se recuerda
+        self.assertTrue(self.im.ajustes().datos["extra"]["activa"])
+        self.im.cambiar_extra("activa", False)
+        self.assertFalse(extra.visible())
+
+    def test_pill_extra_configurar_y_guardar(self):
+        extra = self._extra()
+        self.im.cambiar_extra("activa", True)
+        configurador = extra.abrir_configurador()
+        self.assertIn("Pill extra", configurador.cabecera.text())
+        radial = extra.biblioteca().activo
+        radial["botones"][0]["texto"] = "Extra"
+        extra.modificar(radial)
+        self.assertEqual(extra.pill(crear=False).radial["botones"][0]["texto"], "Extra")
+        self.assertNotEqual(self.im.radial_activo()["botones"][0]["texto"], "Extra")
+        self.cmds.promptDialog.side_effect = lambda *a, **k: "Mi pill" if k.get("query") else "Guardar"
+        self.assertTrue(extra.guardar())
+        self.assertTrue(extra.biblioteca().origen.startswith("mio:"))
+        self.assertIn(extra.biblioteca().origen, [i for i, _ in self.im.biblioteca().mios()])
+
+    def test_pill_extra_al_arrancar(self):
+        self.im.cambiar_extra("activa", True)
+        self.im.detener()
+        self.im.iniciar()
+        self.im._iniciar_extra()
+        self.assertTrue(self._extra().visible())
+
+    def test_ajustes_con_pill_extra(self):
+        ventana = self.im.abrir_ajustes()
+        self.assertFalse(ventana.extra_activa.isChecked())
+        self.assertFalse(ventana.extra_controles.isEnabled())
+        ventana.extra_activa.setChecked(True)
+        self.assertTrue(self._extra().visible())
+        indice = ventana.extra_radial.findData("pre:2_uv_texturas")
+        ventana.extra_radial.setCurrentIndex(indice)
+        ventana.extra_radial.activated.emit(indice)
+        self.assertEqual(self._extra().biblioteca().origen, "pre:2_uv_texturas")
+
+    def test_icono_de_cada_herramienta(self):
+        self.cmds.runTimeCommand.side_effect = lambda *a, **k: (
+            "" if k.get("image") else ([] if k.get("query") else True))
+        self.cmds.resourceManager.side_effect = lambda **k: (
+            ["polyExtrudeFacet.png"] if k.get("nameFilter") == "polyExtrudeFacet.png" else [])
+        self.assertEqual(self.im._icono_de_comando("PolyExtrude"), ":/polyExtrudeFacet.png")
+        self.assertEqual(self.im._icono_de_comando("NoTieneIcono"), "")
 
     def test_volver_a_centrar(self):
         self.im._al_mover(QtCore.QPoint(10, 10))
