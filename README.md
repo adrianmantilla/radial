@@ -4,7 +4,7 @@ Menú flotante para Autodesk Maya 2026 y 2027, en Windows y macOS.
 Pon el ratón sobre un visor y pulsa **Tab dos veces rápido**: aparece el menú. Otro doble Tab lo oculta.
 Cada botón lanza la orden de Maya que tú elijas.
 
-![Doble Tab, gesto y buscador de Radial](docs/radial.gif)
+![Radial en Maya 2027: doble Tab, el menú aparece bajo el ratón, la tarjeta del modo aprendizaje explica cada botón y un clic crea un cubo](docs/radial_maya.gif)
 
 - **Gesto rápido**: Tab, Tab mantenido, mueve el ratón hacia un botón y suelta.
 - Dos formas a juego: **radial** (un anillo de puntos) y **pill** (una cápsula, horizontal o vertical), de 2 a 12 botones.
@@ -59,6 +59,8 @@ Tus radiales y ajustes se conservan.
 El menú sigue a la vista después de pulsar un botón, hasta el siguiente doble Tab.
 Fuera de los botones, la línea y el centro, los clics pasan a Maya, así que puedes seguir trabajando con él abierto.
 
+![Gesto rápido: Tab, Tab mantenido, hacia el botón y soltar; y el buscador](docs/radial.gif)
+
 ### Cuándo cuenta el doble Tab
 
 - Los dos Tab tienen que llegar en menos de 250 ms (se cambia en Ajustes, entre 150 y 400 ms).
@@ -73,7 +75,7 @@ Fuera de los botones, la línea y el centro, los clics pasan a Maya, así que pu
 
 ## Buscador de acciones
 
-![Buscador de acciones](docs/buscador.png)
+<img src="docs/buscador_maya.png" alt="Buscador de acciones en Maya: «extruir» encuentra Poly Extrude y sus variantes" width="360" align="right">
 
 Debajo del radial y de la pill hay una barra **Buscar acción…**. Haz clic en ella y escribe: salen las
 órdenes de Maya (las del Editor de atajos) y los botones de tus estantes que coinciden, con su menú y el
@@ -97,6 +99,8 @@ español debajo, y a la derecha su atajo de teclado si tiene.
   *Edit Mesh › Extrude*) y tus **scripts** `.py` y `.mel` de la carpeta `scripts` de tus preferencias de Maya
   (salen en *Mis scripts*).
 - Se oculta en **Radial > Ajustes > Buscador**.
+
+<br clear="right">
 
 ## Botón con lo último que hice
 
@@ -138,6 +142,8 @@ enseñe a no necesitar el menú.
 ## Pill extra
 
 ![Radial, pill y pill extra](docs/formas.png)
+
+![La pill en Maya, con la tarjeta del modo aprendizaje](docs/pill_maya.png)
 
 En **Radial > Ajustes > Pill extra** (o **Radial > Pill extra**) se activa una **segunda pill flotante**,
 independiente del menú del doble Tab: está siempre a la vista mientras la tengas activa y vuelve a salir
