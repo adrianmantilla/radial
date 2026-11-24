@@ -14,6 +14,7 @@ from radial.qt import QtCore, QtGui, QtWidgets
 
 Qt = QtCore.Qt
 
+DISTANCIA_GESTO = 30
 COLOR_ENCENDIDO = QtGui.QColor(127, 209, 166)
 
 
@@ -38,6 +39,27 @@ class MenuComun(SoltarBoton):
             self.carpeta = None
         if isinstance(getattr(self, "_sobre", None), int) and self._sobre >= self.num():
             self._sobre = None
+
+    # --- Gesto (Tab, Tab mantenido y soltar) ------------------------------------
+
+    def boton_en_gesto(self, inicio, ahora):
+        """El botón al que apunta el gesto que empezó en ``inicio`` (puntos de pantalla), o None.
+
+        Primero cuenta el botón que está bajo el ratón; si no, en el radial, el que está en
+        la dirección en la que se ha movido el ratón (al menos ``DISTANCIA_GESTO`` píxeles).
+        """
+        sobre = self._que_hay(self.mapFromGlobal(ahora))
+        if isinstance(sobre, int):
+            return sobre
+        return self._direccion(ahora.x() - inicio.x(), ahora.y() - inicio.y())
+
+    def _direccion(self, dx, dy):
+        return None  # la pill no tiene direcciones: solo cuenta el botón bajo el ratón
+
+    def marcar_gesto(self, indice):
+        """Resalta el botón al que apunta el gesto (o ninguno)."""
+        if indice != self._sobre:
+            self._fijar_sobre(indice)
 
     def _iniciar_comun(self):
         self.carpeta = None

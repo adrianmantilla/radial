@@ -10,11 +10,13 @@ teclas (y el doble Tab) aunque el menú esté a la vista. Fuera de los puntos,
 la línea y el centro, los clics pasan a Maya.
 """
 
+import math
+
 from radial import radiales as rd
 from radial.dibujo import (COLOR_ABIERTO, COLOR_AGARRE, COLOR_AGARRE_SOBRE, COLOR_BORDE, COLOR_CENTRO,
                            COLOR_DETALLE, COLOR_LINEA, COLOR_PUNTO, COLOR_TEXTO, dibujar_icono_boton,
                            dibujar_texto, mezclar)
-from radial.menu_comun import (COLOR_ENCENDIDO, MenuComun, dibujar_encendido, dibujar_flecha_volver,
+from radial.menu_comun import (COLOR_ENCENDIDO, DISTANCIA_GESTO, MenuComun, dibujar_encendido, dibujar_flecha_volver,
                                  dibujar_insignia_opciones, dibujar_marca_carpeta)
 from radial.qt import QtCore, QtGui, QtWidgets, posicion_global, posicion_local
 
@@ -117,6 +119,15 @@ class MenuRadial(MenuComun, QtWidgets.QWidget):
 
     def _lineas_texto_y(self):
         return (-rd.RADIO_CENTRO - 14, rd.RADIO_CENTRO + 14)
+
+    def _direccion(self, dx, dy):
+        """El botón en la dirección (dx, dy), como en los marking menus."""
+        if math.hypot(dx, dy) < DISTANCIA_GESTO:
+            return None
+        n = self.num()
+        angulo = (math.degrees(math.atan2(dy, dx)) + 90) % 360  # 0 = arriba, sentido del reloj
+        indice = int(round(angulo / (360.0 / n))) % n
+        return indice if self.botones_visibles()[indice]["tipo"] != "vacio" else None
 
     # --- Ratón ----------------------------------------------------------------
 

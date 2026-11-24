@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.join(RAIZ, "scripts"))
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 try:
-    from PySide6 import QtCore, QtWidgets
+    from PySide6 import QtCore, QtGui, QtWidgets
 except ImportError:  # pragma: no cover
     QtWidgets = None
 
@@ -321,6 +321,32 @@ class PruebaInterfaz(unittest.TestCase):
             ["polyExtrudeFacet.png"] if k.get("nameFilter") == "polyExtrudeFacet.png" else [])
         self.assertEqual(self.im._icono_de_comando("PolyExtrude"), ":/polyExtrudeFacet.png")
         self.assertEqual(self.im._icono_de_comando("NoTieneIcono"), "")
+
+    def test_gesto_ejecuta_y_cierra(self):
+        filtro = self.im._estado["filtro"]
+        filtro.manteniendo = True
+        with mock.patch.object(QtGui.QCursor, "pos", staticmethod(lambda: QtCore.QPoint(-3000, -3000))):
+            self.im._al_doble_tab()
+            self.assertTrue(self.im.visible())
+            self.assertIsNotNone(self.im._estado["gesto"])
+        # Se mueve hacia abajo: botón 4 del radial (índice 3)
+        with mock.patch.object(QtGui.QCursor, "pos", staticmethod(lambda: QtCore.QPoint(-3000, -2900))):
+            self.im._seguir_gesto()
+            self.assertEqual(self.im._menu_flotante(crear=False)._sobre, 3)
+            filtro.manteniendo = False
+            self.im._al_soltar_tab()
+        esperado = self.im.radial_activo()["botones"][3]
+        self.assertFalse(self.im.visible())
+        self.assertTrue(self.cmds.method_calls or sys.modules["maya.mel"].eval.called, esperado)
+
+    def test_soltar_sin_moverse_deja_el_menu(self):
+        filtro = self.im._estado["filtro"]
+        filtro.manteniendo = True
+        with mock.patch.object(QtGui.QCursor, "pos", staticmethod(lambda: QtCore.QPoint(-3000, -3000))):
+            self.im._al_doble_tab()
+            filtro.manteniendo = False
+            self.im._al_soltar_tab()
+        self.assertTrue(self.im.visible())
 
     def test_volver_a_centrar(self):
         self.im._al_mover(QtCore.QPoint(10, 10))

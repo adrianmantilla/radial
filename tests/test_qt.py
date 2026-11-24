@@ -78,6 +78,26 @@ class PruebaFiltro(unittest.TestCase):
         self._procesar()
         self.assertEqual(self.avisos, [1])
 
+    def test_mantener_el_segundo_tab_es_un_gesto(self):
+        soltados = []
+        self.filtro._al_soltar_tab = lambda: soltados.append(1)
+        _tecla(self.destino, 1000)
+        self.assertEqual(_tecla(self.destino, 1180), set())
+        self.assertTrue(self.filtro.manteniendo)
+        # La auto-repetición y el soltar de ese Tab no llegan a Maya
+        self.assertEqual(_tecla(self.destino, 1700, repetida=True), set())
+        for repetida in (True, False):
+            evento = QtGui.QKeyEvent(QEvent.KeyRelease, Qt.Key_Tab, Qt.NoModifier, "\t", repetida)
+            self.assertTrue(self.filtro.eventFilter(self.destino, evento))
+        self._procesar()
+        self.assertFalse(self.filtro.manteniendo)
+        self.assertEqual(soltados, [1])
+        # Después, mantener Tab vuelve a ser de Maya
+        self.assertEqual(len(_tecla(self.destino, 5000)), 2)
+        self.assertEqual(len(_tecla(self.destino, 5400, repetida=True)), 2)
+        evento = QtGui.QKeyEvent(QEvent.KeyRelease, Qt.Key_Tab, Qt.NoModifier, "\t", False)
+        self.assertFalse(self.filtro.eventFilter(self.destino, evento))
+
     def test_dos_tab_lentos_llegan_los_dos(self):
         self.assertEqual(len(_tecla(self.destino, 1000)), 2)
         self.assertEqual(len(_tecla(self.destino, 1400)), 2)
@@ -187,6 +207,19 @@ class PruebaMenu(unittest.TestCase):
         self.assertEqual(self.menu.centro_global() - antes, QtCore.QPoint(120, 40))
         self.assertEqual(self.movidos, [self.menu.centro_global()])
         self.assertEqual(self.ejecutados, [])
+
+    def test_gesto_por_direccion(self):
+        inicio = QtCore.QPoint(0, 0)
+        self.assertIsNone(self.menu._direccion(5, 5))  # sin moverse no hay botón
+        self.assertEqual(self.menu._direccion(0, -80), 0)   # arriba
+        self.assertEqual(self.menu._direccion(0, 80), 3)    # abajo
+        self.assertEqual(self.menu._direccion(70, -40), 1)  # arriba a la derecha
+        lejos = self.menu.mapToGlobal(QtCore.QPoint(-500, -500))
+        self.assertIsNone(self.menu.boton_en_gesto(lejos, lejos))
+        punto = self.menu.mapToGlobal(self._punto_boton(4))
+        self.assertEqual(self.menu.boton_en_gesto(inicio, punto), 4)  # el que está bajo el ratón
+        self.menu.marcar_gesto(4)
+        self.assertEqual(self.menu._sobre, 4)
 
     def test_clic_derecho_en_el_centro_configura(self):
         self._raton(QEvent.MouseButtonPress, self._centro(), Qt.RightButton)

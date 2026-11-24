@@ -21,7 +21,8 @@ COMANDO_CONFIGURAR = "RadialConfigurar"
 
 _estado = {"menu": None, "filtro": None, "ajustes": None, "biblioteca": None,
            "configurador": None, "ventana_ajustes": None, "gestor": None, "buscador": None,
-           "tarjeta": None, "reloj_automatico": None, "contexto": None, "fuentes": None}
+           "tarjeta": None, "reloj_automatico": None, "contexto": None, "fuentes": None,
+           "reloj_gesto": None, "gesto": None}
 
 
 # --- Ajustes y biblioteca -------------------------------------------------------
@@ -710,6 +711,7 @@ def abrir_gestor():
 
 
 def _cerrar_ventanas():
+    _parar_gesto()
     reloj = _estado.get("reloj_automatico")
     if sigue_vivo(reloj):
         reloj.stop()
@@ -749,6 +751,63 @@ def _puede_contar(es_segundo):
     return visible() or _sobre_visor()
 
 
+# Gesto: Tab, Tab sin soltar el segundo, mover el ratón hacia un botón y soltar.
+
+def _al_doble_tab():
+    alternar()
+    filtro = _estado.get("filtro")
+    if visible() and filtro is not None and filtro.manteniendo:
+        _empezar_gesto()
+
+
+def _empezar_gesto():
+    reloj = _estado.get("reloj_gesto")
+    if not sigue_vivo(reloj):
+        reloj = QtCore.QTimer(ventana_maya())
+        reloj.setInterval(16)
+        reloj.timeout.connect(_seguir_gesto)
+        _estado["reloj_gesto"] = reloj
+    _estado["gesto"] = QtGui.QCursor.pos()
+    reloj.start()
+
+
+def _seguir_gesto():
+    menu = _menu_flotante(crear=False)
+    inicio = _estado.get("gesto")
+    filtro = _estado.get("filtro")
+    if menu is None or inicio is None or not menu.isVisible() or filtro is None or not filtro.manteniendo:
+        _parar_gesto()
+        return
+    menu.marcar_gesto(menu.boton_en_gesto(inicio, QtGui.QCursor.pos()))
+
+
+def _parar_gesto():
+    reloj = _estado.get("reloj_gesto")
+    if sigue_vivo(reloj):
+        reloj.stop()
+
+
+def _al_soltar_tab():
+    """Fin del gesto: si apunta a un botón, se ejecuta y el menú se cierra; si no, se queda abierto."""
+    _parar_gesto()
+    inicio = _estado.pop("gesto", None)
+    menu = _menu_flotante(crear=False)
+    if inicio is None or menu is None or not menu.isVisible():
+        return
+    indice = menu.boton_en_gesto(inicio, QtGui.QCursor.pos())
+    if indice is None:
+        return
+    boton = menu.botones_visibles()[indice]
+    if boton["tipo"] == "carpeta":
+        menu.abrir_carpeta(indice)
+        return
+    if boton["tipo"] == "vacio":
+        return
+    from radial import acciones
+    acciones.ejecutar(boton)
+    ocultar()
+
+
 def _instalar_filtro(intentos=10):
     """Escucha el teclado en las ventanas de Maya (no en toda la aplicación)."""
     if os.environ.get("RADIAL_SIN_TECLADO"):
@@ -761,7 +820,7 @@ def _instalar_filtro(intentos=10):
             QtCore.QTimer.singleShot(1000, lambda: _instalar_filtro(intentos - 1))
         return
     _quitar_filtro()
-    filtro = FiltroTeclado(_puede_contar, alternar, ajustes().ventana_ms)
+    filtro = FiltroTeclado(_puede_contar, _al_doble_tab, ajustes().ventana_ms, al_soltar_tab=_al_soltar_tab)
     filtro.instalar([ventana])
     # Paneles separados de la ventana principal: se escuchan cuando reciben el foco.
     QtGui.QGuiApplication.instance().focusWindowChanged.connect(filtro.escuchar)
