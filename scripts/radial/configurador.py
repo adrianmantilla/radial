@@ -6,6 +6,7 @@ momento en el menú; «Guardar» lo escribe en el archivo del radial.
 """
 
 from radial import iconos, interruptores
+from radial.busqueda import sin_acentos as busqueda_sin_acentos
 from radial import radiales as rd
 from radial.dibujo import qicono
 from radial.i18n import t
@@ -21,6 +22,12 @@ def pagina_de(boton):
     if interruptores.clave_de(boton):
         return "interruptor"
     return boton["tipo"]
+
+
+def _qicono_boton(boton):
+    """El icono del botón para las listas: el suyo o el automático según su acción."""
+    icono = iconos.de_boton(boton)
+    return qicono(icono) if icono else QtGui.QIcon()
 
 
 def _titulo_boton(boton):
@@ -149,10 +156,13 @@ class Configurador(QtWidgets.QDialog):
         self.lista_iconos.setGridSize(QtCore.QSize(32, 32))
         self.lista_iconos.setMovement(QtWidgets.QListView.Static)
         self.lista_iconos.setResizeMode(QtWidgets.QListView.Adjust)
-        self.lista_iconos.setFixedHeight(76)
+        self.lista_iconos.setFixedHeight(132)
+        self.filtro_iconos = QtWidgets.QLineEdit()
+        self.filtro_iconos.setPlaceholderText(t("config_filtrar_iconos"))
+        self.filtro_iconos.setClearButtonEnabled(True)
         for nombre in sorted(iconos.TRAZOS):
             item = QtWidgets.QListWidgetItem(qicono(nombre), "")
-            item.setToolTip(nombre)
+            item.setToolTip(nombre.replace("_", " "))
             item.setData(Qt.UserRole, nombre)
             self.lista_iconos.addItem(item)
         botones_icono = QtWidgets.QHBoxLayout()
@@ -162,6 +172,7 @@ class Configurador(QtWidgets.QDialog):
         botones_icono.addWidget(self.icono_actual, 1)
         botones_icono.addWidget(self.boton_icono_maya)
         botones_icono.addWidget(self.boton_sin_icono)
+        fila_iconos.addWidget(self.filtro_iconos)
         fila_iconos.addWidget(self.lista_iconos)
         fila_iconos.addLayout(botones_icono)
         derecha.addRow(t("config_icono"), fila_iconos)
@@ -208,6 +219,7 @@ class Configurador(QtWidgets.QDialog):
         self.detalle.textEdited.connect(lambda v: self._cambiar(detalle=v))
         self.lista_iconos.itemClicked.connect(lambda item: self._cambiar(icono=item.data(Qt.UserRole)))
         self.boton_icono_maya.clicked.connect(self._elegir_icono_maya)
+        self.filtro_iconos.textChanged.connect(self._filtrar_iconos)
         self.boton_sin_icono.clicked.connect(lambda: self._cambiar(icono=""))
         self.tipo.currentIndexChanged.connect(self._tipo_cambiado)
         self.codigo_python.textChanged.connect(lambda: self._codigo_cambiado("python", self.codigo_python))
@@ -400,8 +412,7 @@ class Configurador(QtWidgets.QDialog):
         self.huecos.blockSignals(True)
         self.huecos.clear()
         for i, boton in enumerate(self.botones_nivel()):
-            item = QtWidgets.QListWidgetItem(qicono(boton["icono"]) if boton["icono"] else QtGui.QIcon(),
-                                             "{}   {}".format(i + 1, _titulo_boton(boton)))
+            item = QtWidgets.QListWidgetItem(_qicono_boton(boton), "{}   {}".format(i + 1, _titulo_boton(boton)))
             item.setData(Qt.UserRole, i)
             self.huecos.addItem(item)
         self.huecos.blockSignals(False)
@@ -410,7 +421,7 @@ class Configurador(QtWidgets.QDialog):
         boton = self.botones_nivel()[i]
         item = self.huecos.item(i)
         item.setText("{}   {}".format(i + 1, _titulo_boton(boton)))
-        item.setIcon(qicono(boton["icono"]) if boton["icono"] else QtGui.QIcon())
+        item.setIcon(_qicono_boton(boton))
 
     def _mostrar_hueco(self, fila):
         if fila < 0:
@@ -448,9 +459,19 @@ class Configurador(QtWidgets.QDialog):
         if icono and icono not in iconos.TRAZOS:
             self.icono_actual.setPixmap(QtGui.QIcon(icono).pixmap(24, 24))
             self.icono_actual.setToolTip(icono)
+        elif not icono and iconos.de_boton(self.boton):
+            # Sin icono elegido: el automático según la acción
+            self.icono_actual.clear()
+            self.icono_actual.setText(t("config_icono_automatico"))
         else:
             self.icono_actual.clear()
             self.icono_actual.setText(t("config_icono_ninguno") if not icono else "")
+
+    def _filtrar_iconos(self, texto):
+        texto = busqueda_sin_acentos(texto.strip())
+        for i in range(self.lista_iconos.count()):
+            item = self.lista_iconos.item(i)
+            item.setHidden(bool(texto) and texto not in item.data(Qt.UserRole).replace("_", " "))
 
     def _mostrar_estado(self):
         boton = self.boton
@@ -478,8 +499,7 @@ class Configurador(QtWidgets.QDialog):
         nuevo = rd.normalizar_boton(boton) if boton["tipo"] in ("vacio", "carpeta") \
             else self._normalizar_sin_vaciar(boton)
         self._fijar_boton(nuevo)
-        if "icono" in cambios:
-            self._mostrar_icono(self.boton["icono"])
+        self._mostrar_icono(self.boton["icono"])
         self._actualizar_hueco(self.indice)
         self._mostrar_estado()
         self._avisar()
@@ -603,8 +623,7 @@ class Configurador(QtWidgets.QDialog):
         if not self._estantes or indice < 0:
             return
         for boton in self._estantes[indice][1]:
-            item = QtWidgets.QListWidgetItem(QtGui.QIcon(boton["icono"]) if boton["icono"] else QtGui.QIcon(),
-                                             boton["texto"])
+            item = QtWidgets.QListWidgetItem(_qicono_boton(boton), boton["texto"])
             item.setToolTip(boton.get("descripcion") or boton["accion"][:300])
             item.setData(Qt.UserRole, boton)
             self.lista_estante.addItem(item)

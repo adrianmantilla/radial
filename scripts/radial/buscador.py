@@ -160,13 +160,19 @@ class ListaResultados(QtWidgets.QWidget):
     # --- Dibujo ---------------------------------------------------------------
 
     def icono_de(self, accion):
-        """El icono de la herramienta: el del botón, el de Maya para ese comando o "" si no tiene."""
-        icono = accion["boton"].get("icono", "")
-        if not icono and accion["boton"].get("tipo") == "comando" and self.buscar_icono is not None:
+        """El icono de la herramienta: el del botón o uno de línea del mismo estilo que el plugin.
+
+        Los iconos de Maya a color (``buscar_icono``) solo se usan si el comando
+        no tiene uno propio, cosa que casi no pasa.
+        """
+        boton = accion["boton"]
+        categoria = accion.get("categoria", "") if boton.get("tipo") == "comando" else ""
+        icono = iconos.de_boton(boton, categoria)
+        if icono == "orden" and self.buscar_icono is not None and not boton.get("icono"):
             try:
-                icono = self.buscar_icono(accion["nombre"]) or ""
-            except Exception:  # sin icono la fila se ve igual de bien
-                icono = ""
+                icono = self.buscar_icono(accion["nombre"]) or icono
+            except Exception:  # sin icono de Maya se queda el genérico
+                pass
         return icono
 
     def _icono(self, accion, lado):
@@ -227,7 +233,7 @@ class ListaResultados(QtWidgets.QWidget):
             pintor.setPen(Qt.NoPen)
             pintor.setBrush(QtGui.QColor(0, 0, 0, 30) if elegida else COLOR_CIRCULO)
             pintor.drawEllipse(centro, 12, 12)
-            mapa, propio = self._icono(accion, 20 if iconos.es_imagen(self.icono_de(accion)) else 14)
+            mapa, propio = self._icono(accion, 20 if iconos.es_imagen(self.icono_de(accion)) else 16)
             if mapa is not None and propio:
                 # Icono de Maya a color, tal cual
                 pintor.drawPixmap(QtCore.QRectF(centro.x() - 10, centro.y() - 10, 20, 20), mapa,
@@ -235,7 +241,7 @@ class ListaResultados(QtWidgets.QWidget):
             elif mapa is not None:
                 if elegida:
                     mapa = self._oscurecer(mapa)
-                pintor.drawPixmap(QtCore.QRectF(centro.x() - 7, centro.y() - 7, 14, 14), mapa,
+                pintor.drawPixmap(QtCore.QRectF(centro.x() - 8, centro.y() - 8, 16, 16), mapa,
                                   QtCore.QRectF(mapa.rect()))
             else:
                 # Sin icono: la inicial de la herramienta

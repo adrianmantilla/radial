@@ -67,9 +67,10 @@ def qicono(icono, tamano=20, color="#ececec"):
 def dibujar_icono_boton(pintor, boton, centro, radio, opacidad, cache, escala):
     """Dibuja el icono del botón (o su inicial) dentro del círculo blanco."""
     tamano = min(22.0, radio * 1.25)
-    clave = (boton["icono"], escala)
+    icono = iconos.de_boton(boton)
+    clave = (icono, escala)
     if clave not in cache:
-        cache[clave] = pixmap_icono(boton["icono"], 22.0, escala)
+        cache[clave] = pixmap_icono(icono, 22.0, escala)
     mapa = cache[clave]
     x, y = centro
     pintor.save()

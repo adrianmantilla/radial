@@ -82,9 +82,15 @@ class FuentesMaya(object):
         if imagen and not os.path.isfile(imagen) and not imagen.startswith(":"):
             imagen = ":/" + imagen
         texto = etiqueta or descripcion or orden.strip().splitlines()[0]
-        return {"texto": texto[:40], "detalle": "", "icono": imagen,
-                "tipo": "python" if lenguaje.lower() == "python" else "mel", "accion": orden,
-                "descripcion": descripcion}
+        boton = {"texto": texto[:40], "detalle": "", "icono": imagen,
+                 "tipo": "python" if lenguaje.lower() == "python" else "mel", "accion": orden,
+                 "descripcion": descripcion}
+        # Si se reconoce el comando, el icono de línea del plugin en lugar del de Maya a color
+        from radial import iconos
+        propio = iconos.de_imagen_maya(boton)
+        if propio:
+            boton["icono"] = propio
+        return boton
 
     def menus(self, profundidad=3):
         """Lista de (ruta, etiqueta, botón) con las órdenes de los menús de la ventana de Maya.

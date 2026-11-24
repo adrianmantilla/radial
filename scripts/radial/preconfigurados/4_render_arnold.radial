@@ -12,7 +12,7 @@
     {
       "texto": "Ajustes",
       "detalle": "de render",
-      "icono": "engranaje",
+      "icono": "ajustes_render",
       "tipo": "comando",
       "accion": "RenderGlobalsWindow"
     },
@@ -26,7 +26,7 @@
     {
       "texto": "Luz",
       "detalle": "de área",
-      "icono": "luz",
+      "icono": "luz_area",
       "tipo": "python",
       "accion": "import maya.cmds as cmds\nif not cmds.pluginInfo('mtoa', query=True, loaded=True):\n    cmds.loadPlugin('mtoa')\nimport mtoa.utils as mutils\nmutils.createLocator('aiAreaLight', asLight=True)"
     },

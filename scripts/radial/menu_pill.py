@@ -7,6 +7,7 @@ puntitos del extremo; clic derecho en ellos abre el configurador. Tiene la
 misma interfaz que ``MenuRadial`` para que el resto del plugin no distinga.
 """
 
+from radial import iconos
 from radial import radiales as rd
 from radial.dibujo import (COLOR_ABIERTO, COLOR_AGARRE, COLOR_AGARRE_SOBRE, COLOR_BORDE_FONDO,
                            COLOR_DETALLE, COLOR_FONDO, COLOR_ICONO_CLARO, COLOR_INICIAL, COLOR_INICIAL_ABIERTO,
@@ -282,10 +283,11 @@ class MenuPill(MenuComun, QtWidgets.QWidget):
 
     def _iconos(self, boton, lado):
         escala = self.devicePixelRatioF()
-        clave = (boton["icono"], lado, escala)
+        icono = iconos.de_boton(boton)
+        clave = (icono, lado, escala)
         if clave not in self._cache:
-            self._cache[clave] = (pixmap_icono(boton["icono"], lado, escala, COLOR_ICONO_CLARO),
-                                  pixmap_icono(boton["icono"], lado, escala))
+            self._cache[clave] = (pixmap_icono(icono, lado, escala, COLOR_ICONO_CLARO),
+                                  pixmap_icono(icono, lado, escala))
         return self._cache[clave]
 
     def paintEvent(self, evento):
