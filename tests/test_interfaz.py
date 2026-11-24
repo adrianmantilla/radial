@@ -266,6 +266,9 @@ class PruebaInterfaz(unittest.TestCase):
         self.im.cambiar_extra("apariencia", {"pill_boton": 40, "opacidad": 0.5})
         self.assertEqual(extra.pill(crear=False).apariencia["pill_boton"], 40)
         self.assertNotEqual(self.im.radial_activo()["apariencia"]["opacidad"], 0.5)
+        self.im.cambiar_extra("cantidad", 9)
+        self.assertEqual(extra.pill(crear=False).num(), 9)
+        self.assertEqual(len(self.im.radial_activo()["botones"]), 6)
         self.im.cambiar_extra("vertical", True)
         menu = extra.pill(crear=False)
         self.assertTrue(menu.vertical)
@@ -303,10 +306,13 @@ class PruebaInterfaz(unittest.TestCase):
         self.assertFalse(ventana.extra_controles.isEnabled())
         ventana.extra_activa.setChecked(True)
         self.assertTrue(self._extra().visible())
+
         indice = ventana.extra_radial.findData("pre:2_uv_texturas")
         ventana.extra_radial.setCurrentIndex(indice)
         ventana.extra_radial.activated.emit(indice)
         self.assertEqual(self._extra().biblioteca().origen, "pre:2_uv_texturas")
+        ventana.extra_cantidad.setValue(4)
+        self.assertEqual(self._extra().pill(crear=False).num(), 4)
 
     def test_icono_de_cada_herramienta(self):
         self.cmds.runTimeCommand.side_effect = lambda *a, **k: (

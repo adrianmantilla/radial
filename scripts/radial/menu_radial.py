@@ -48,7 +48,7 @@ class MenuRadial(MenuComun, QtWidgets.QWidget):
         self._al_configurar = al_configurar
 
         self.radial = rd.normalizar({"botones": []})
-        self._apertura = [0.0] * rd.NUM_BOTONES
+        self._apertura = [0.0] * self.num()
         self._sobre = None          # índice de botón, "centro" o None
         self._pulsado = None        # botón donde empezó el clic
         self._arrastre = None       # desplazamiento ratón - esquina durante el arrastre
@@ -72,6 +72,7 @@ class MenuRadial(MenuComun, QtWidgets.QWidget):
         """Cambia los botones y el tamaño, conservando el centro en pantalla."""
         centro = self.centro_global() if self.isVisible() else None
         self.radial = rd.normalizar(radial)
+        self._ajustar_a_cantidad()
         self._cache_iconos = {}
         lado = rd.lado_ventana(self.apariencia)
         self.setFixedSize(lado, lado)
@@ -93,7 +94,7 @@ class MenuRadial(MenuComun, QtWidgets.QWidget):
         return punto.x() - self.width() / 2.0, punto.y() - self.height() / 2.0
 
     def _que_hay(self, punto):
-        return rd.que_hay_en(*self._local(punto), apariencia=self.apariencia)
+        return rd.que_hay_en(*self._local(punto), apariencia=self.apariencia, n=self.num())
 
     # --- Máscara: solo los puntos, la línea, el centro y el texto reciben clics
 
@@ -106,7 +107,7 @@ class MenuRadial(MenuComun, QtWidgets.QWidget):
             return QtGui.QRegion(int(c + x - r), int(c + y - r), 2 * r, 2 * r, QtGui.QRegion.Ellipse)
 
         region = circulo(0, 0, ap["radio"] + 2.5).subtracted(circulo(0, 0, ap["radio"] - 2.5))
-        for x, y in rd.posiciones(ap["radio"]):
+        for x, y in rd.posiciones(ap["radio"], self.num()):
             region = region.united(circulo(x, y, ap["abierto"] + 3))
         region = region.united(circulo(0, 0, rd.RADIO_CENTRO + 4))
         ancho = int(max(80, 2 * (ap["radio"] - ap["abierto"]) - 4))
@@ -138,14 +139,16 @@ class MenuRadial(MenuComun, QtWidgets.QWidget):
         if self._arrastre is not None:
             self.move(posicion_global(evento) - self._arrastre)
             return
-        self._fijar_sobre(rd.que_hay_en(*self._local(posicion_local(evento)), apariencia=self.apariencia))
+        self._fijar_sobre(rd.que_hay_en(*self._local(posicion_local(evento)), apariencia=self.apariencia,
+                                       n=self.num()))
 
     def leaveEvent(self, evento):
         if self._arrastre is None:
             self._fijar_sobre(None)
 
     def mousePressEvent(self, evento):
-        sobre = rd.que_hay_en(*self._local(posicion_local(evento)), apariencia=self.apariencia)
+        sobre = rd.que_hay_en(*self._local(posicion_local(evento)), apariencia=self.apariencia,
+                              n=self.num())
         if sobre == "centro" and evento.button() == Qt.LeftButton:
             self._inicio_clic = posicion_global(evento)
             self._arrastre = posicion_global(evento) - self.pos()
@@ -168,7 +171,8 @@ class MenuRadial(MenuComun, QtWidgets.QWidget):
             elif not quieto and self._al_mover:
                 self._al_mover(self.centro_global())
             return
-        sobre = rd.que_hay_en(*self._local(posicion_local(evento)), apariencia=self.apariencia)
+        sobre = rd.que_hay_en(*self._local(posicion_local(evento)), apariencia=self.apariencia,
+                              n=self.num())
         pulsado, self._pulsado = self._pulsado, None
         if evento.button() == Qt.LeftButton and isinstance(sobre, int) and sobre == pulsado:
             self._pulsar(sobre, evento.modifiers())
@@ -181,7 +185,7 @@ class MenuRadial(MenuComun, QtWidgets.QWidget):
         self._arrastre = None
         self._pulsado = None
         self._sobre = None
-        self._apertura = [0.0] * rd.NUM_BOTONES
+        self._apertura = [0.0] * self.num()
         self._reloj.stop()
         super(MenuRadial, self).hideEvent(evento)
 
@@ -189,7 +193,7 @@ class MenuRadial(MenuComun, QtWidgets.QWidget):
 
     def _animar(self):
         quietos = True
-        for i in range(rd.NUM_BOTONES):
+        for i in range(self.num()):
             vacio = self.botones_visibles()[i]["tipo"] == "vacio"
             objetivo = 1.0 if (self._sobre == i and (not vacio or self._soltando)) else 0.0
             actual = self._apertura[i]
@@ -232,7 +236,7 @@ class MenuRadial(MenuComun, QtWidgets.QWidget):
                     pintor.drawEllipse(QtCore.QPointF(x, y), 1.3, 1.3)
 
         # Botones
-        for i, (x, y) in enumerate(rd.posiciones(ap["radio"])):
+        for i, (x, y) in enumerate(rd.posiciones(ap["radio"], self.num())):
             boton = self.botones_visibles()[i]
             a = self._apertura[i]
             r = ap["punto"] + (ap["abierto"] - ap["punto"]) * a

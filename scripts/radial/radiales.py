@@ -32,7 +32,8 @@ import re
 import unicodedata
 
 FORMATO = 1
-NUM_BOTONES = 6
+NUM_BOTONES = 6  # botones de un radial (y de una carpeta) si no se dice otra cosa
+MIN_BOTONES, MAX_BOTONES = 2, 12  # lo que puede tener un radial con «cantidad»
 EXTENSION = ".radial"
 TIPOS = ("comando", "python", "mel", "carpeta", "vacio")
 CARPETA_PRECONFIGURADOS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "preconfigurados")
@@ -94,11 +95,18 @@ def normalizar_boton(datos, carpeta_permitida=True):
     return boton
 
 
-def normalizar_botones(lista, carpeta_permitida=True):
-    """Exactamente seis botones válidos."""
+def normalizar_botones(lista, carpeta_permitida=True, cantidad=NUM_BOTONES):
+    """Exactamente ``cantidad`` botones válidos (seis si no se dice)."""
     lista = lista if isinstance(lista, list) else []
-    botones = [normalizar_boton(b, carpeta_permitida) for b in lista[:NUM_BOTONES]]
-    return botones + [boton_vacio() for _ in range(NUM_BOTONES - len(botones))]
+    botones = [normalizar_boton(b, carpeta_permitida) for b in lista[:cantidad]]
+    return botones + [boton_vacio() for _ in range(cantidad - len(botones))]
+
+
+def normalizar_cantidad(valor):
+    """Número de botones de un radial, entre MIN_BOTONES y MAX_BOTONES (seis si no vale)."""
+    if isinstance(valor, bool) or not isinstance(valor, (int, float)):
+        return NUM_BOTONES
+    return int(max(MIN_BOTONES, min(MAX_BOTONES, int(valor))))
 
 
 def normalizar(datos):
@@ -113,15 +121,25 @@ def normalizar(datos):
     if datos.get("formato", FORMATO) > FORMATO:
         raise RadialNoValido("formato más nuevo que esta versión del plugin")
     nombre = datos.get("nombre")
+    cantidad = normalizar_cantidad(datos.get("cantidad"))
     radial = {
         "formato": FORMATO,
         "nombre": nombre.strip() if isinstance(nombre, str) and nombre.strip() else "Radial",
-        "botones": normalizar_botones(datos["botones"]),
+        "botones": normalizar_botones(datos["botones"], cantidad=cantidad),
         "apariencia": normalizar_apariencia(datos.get("apariencia")),
     }
+    if cantidad != NUM_BOTONES:
+        radial["cantidad"] = cantidad
     if datos.get("bloqueado") is True:
         radial["bloqueado"] = True
     return radial
+
+
+def cambiar_cantidad(radial, cantidad):
+    """Copia de ``radial`` con ``cantidad`` botones: los que sobran se quitan, los nuevos van vacíos."""
+    nuevo = dict(radial)
+    nuevo["cantidad"] = normalizar_cantidad(cantidad)
+    return normalizar(nuevo)
 
 
 def leer(ruta):
@@ -181,9 +199,9 @@ def lado_ventana(apariencia):
     return int(math.ceil(2 * (apariencia["radio"] + apariencia["abierto"] + 6)))
 
 
-def que_hay_en(x, y, apariencia):
+def que_hay_en(x, y, apariencia, n=NUM_BOTONES):
     """Qué hay bajo el punto (x, y): un índice de botón, ``"centro"`` o None."""
-    for i, (bx, by) in enumerate(posiciones(apariencia["radio"])):
+    for i, (bx, by) in enumerate(posiciones(apariencia["radio"], n)):
         if math.hypot(x - bx, y - by) <= apariencia["abierto"] + 2:
             return i
     if math.hypot(x, y) <= RADIO_CENTRO + 4:
@@ -200,17 +218,17 @@ PILL_SEPARACION = 4
 PILL_RAYA = 9
 
 
-def geometria_pill(apariencia, vertical=False):
+def geometria_pill(apariencia, vertical=False, n=NUM_BOTONES):
     """Tamaño de la cápsula y rectángulos (x, y, ancho, alto) del agarre y los botones.
 
     Devuelve ``(ancho, alto, agarre, [botones])`` con el origen en la esquina.
     """
     b = int(round(apariencia["pill_boton"]))
-    largo = PILL_MARGEN * 2 + PILL_AGARRE + PILL_RAYA + NUM_BOTONES * b + (NUM_BOTONES - 1) * PILL_SEPARACION
+    largo = PILL_MARGEN * 2 + PILL_AGARRE + PILL_RAYA + n * b + (n - 1) * PILL_SEPARACION
     grueso = b + PILL_MARGEN * 2
     botones = []
     pos = PILL_MARGEN + PILL_AGARRE + PILL_RAYA
-    for _ in range(NUM_BOTONES):
+    for _ in range(n):
         botones.append((pos, PILL_MARGEN, b, b))
         pos += b + PILL_SEPARACION
     agarre = (PILL_MARGEN, PILL_MARGEN, PILL_AGARRE, b)
@@ -221,9 +239,9 @@ def geometria_pill(apariencia, vertical=False):
     return largo, grueso, agarre, botones
 
 
-def que_hay_en_pill(x, y, apariencia, vertical=False):
+def que_hay_en_pill(x, y, apariencia, vertical=False, n=NUM_BOTONES):
     """Índice de botón, ``"centro"`` (el agarre) o None, con el origen en la esquina."""
-    _, _, agarre, botones = geometria_pill(apariencia, vertical)
+    _, _, agarre, botones = geometria_pill(apariencia, vertical, n)
     for i, (bx, by, bw, bh) in enumerate(botones):
         if math.hypot(x - (bx + bw / 2.0), y - (by + bh / 2.0)) <= bw / 2.0 + 1:
             return i

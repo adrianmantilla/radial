@@ -185,5 +185,6 @@
   "extra_error": "Radial: no se pudo mostrar la pill extra ({error}).",
   "menu_pill_extra": "Pill extra",
   "menu_pill_extra_configurar": "Configurar la pill extra...",
-  "ajustes_pestana_menu": "Menú"
+  "ajustes_pestana_menu": "Menú",
+  "ajustes_extra_cantidad": "Número de botones"
 }

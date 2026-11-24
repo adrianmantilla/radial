@@ -66,11 +66,24 @@ class ListaResultados(QtWidgets.QWidget):
         self.buscar_icono = None
 
     def fijar(self, acciones, consulta, titulo="", vacio=""):
+        self._todas = list(acciones)
         self.acciones = list(acciones)
         self.consulta = consulta
         self.titulo = titulo
         self.vacio = vacio
         self.elegida = 0
+        self.setFixedHeight(self.alto_necesario())
+        self.update()
+
+    def filas_que_caben(self, alto):
+        """Cuántas filas caben en ``alto`` píxeles."""
+        return max(0, int((alto - 2 * MARGEN - (22 if self.titulo else 0)) // ALTO_FILA))
+
+    def ajustar_filas(self, maximo):
+        """Enseña como mucho ``maximo`` filas (None: todas) para no salirse de la pantalla."""
+        todas = getattr(self, "_todas", self.acciones)
+        self.acciones = list(todas if maximo is None else todas[:max(1, maximo)])
+        self.elegida = min(self.elegida, max(0, len(self.acciones) - 1))
         self.setFixedHeight(self.alto_necesario())
         self.update()
 
@@ -345,6 +358,7 @@ class Buscador(QtWidgets.QWidget):
         zona = self._zona(QtCore.QPoint(centro_x, y))
         if zona is not None and y + self.height() > zona.bottom():
             y = arriba.y() - self.height() - SEPARACION  # no cabe debajo: encima del menú
+        self._sitio = QtCore.QPoint(x, y)
         self.move(x, y)
         self._colocar_lista()
 
@@ -354,14 +368,36 @@ class Buscador(QtWidgets.QWidget):
         return pantalla.availableGeometry() if pantalla is not None else None
 
     def _colocar_lista(self):
+        """La lista va siempre pegada debajo de la barra, sin taparla.
+
+        Si no cabe entera, se queda con las filas que caben; solo si caben menos de tres se
+        abre hacia arriba. Se usa el sitio pedido para la barra (``_sitio``), no el que diga
+        la ventana, que en macOS puede ir un paso por detrás mientras se mueve.
+        """
         lista = self.lista
+        if not sigue_vivo(lista):
+            return
         lista.setFixedWidth(max(self.width(), ANCHO_RADIAL))
-        x = self.x() + (self.width() - lista.width()) // 2
-        y = self.y() + self.height() + 4
-        zona = self._zona(self.geometry().center())
+        sitio = getattr(self, "_sitio", None) or self.pos()
+        arriba, abajo = sitio.y(), sitio.y() + self.height()
+        x = sitio.x() + (self.width() - lista.width()) // 2
+        zona = self._zona(QtCore.QPoint(sitio.x() + self.width() // 2, abajo))
+        lista.ajustar_filas(None)
+        y = abajo + 4
         if zona is not None and y + lista.height() > zona.bottom():
-            y = self.y() - lista.height() - 4  # se abre hacia arriba
+            caben = lista.filas_que_caben(zona.bottom() - y)
+            if caben >= 3:
+                lista.ajustar_filas(caben)
+            else:
+                lista.ajustar_filas(lista.filas_que_caben(arriba - 4 - zona.top()))
+                y = arriba - lista.height() - 4  # se abre hacia arriba
         lista.move(x, y)
+
+    def moveEvent(self, evento):
+        super(Buscador, self).moveEvent(evento)
+        self._sitio = self.pos()
+        if sigue_vivo(self.lista) and self.lista.isVisible():
+            self._colocar_lista()
 
     def resizeEvent(self, evento):
         self.campo.setGeometry(34, 1, self.width() - 34 - 12, ALTO_CAMPO)
@@ -449,6 +485,8 @@ class Buscador(QtWidgets.QWidget):
         self._colocar_lista()
         self.lista.show()
         self.lista.raise_()
+        # Por si la ventana se movió entre medias (macOS coloca las ventanas un poco después).
+        QtCore.QTimer.singleShot(0, self._colocar_lista)
 
     def cerrar_lista(self):
         if sigue_vivo(self.lista):

@@ -158,6 +158,35 @@ class PruebaAjustesExtra(unittest.TestCase):
                              "Solo en la extra")
 
 
+class PruebaCantidad(unittest.TestCase):
+    def test_por_defecto_seis_y_limites(self):
+        self.assertEqual(len(rd.por_defecto()["botones"]), 6)
+        self.assertNotIn("cantidad", rd.por_defecto())
+        for pedida, esperada in ((9, 9), (1, rd.MIN_BOTONES), (40, rd.MAX_BOTONES), ("x", 6), (True, 6)):
+            radial = rd.normalizar({"botones": [], "cantidad": pedida})
+            self.assertEqual(len(radial["botones"]), esperada, pedida)
+
+    def test_cambiar_cantidad_conserva_lo_que_cabe(self):
+        radial = rd.cambiar_cantidad(rd.por_defecto(), 8)
+        self.assertEqual(len(radial["botones"]), 8)
+        self.assertEqual(radial["botones"][0], rd.por_defecto()["botones"][0])
+        self.assertEqual(radial["botones"][7]["tipo"], "vacio")
+        menos = rd.cambiar_cantidad(radial, 3)
+        self.assertEqual(len(menos["botones"]), 3)
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertEqual(len(rd.leer(rd.escribir(radial, os.path.join(tmp, "a.radial")))["botones"]), 8)
+
+    def test_geometria_de_la_pill(self):
+        ap = rd.normalizar_apariencia({})
+        ancho6 = rd.geometria_pill(ap)[0]
+        ancho9, _, _, botones = rd.geometria_pill(ap, n=9)
+        self.assertEqual(len(botones), 9)
+        self.assertGreater(ancho9, ancho6)
+        x, y, w, h = botones[8]
+        self.assertEqual(rd.que_hay_en_pill(x + w / 2, y + h / 2, ap, n=9), 8)
+        self.assertEqual(len(rd.posiciones(80, 9)), 9)
+
+
 class PruebaGlosario(unittest.TestCase):
     def test_formato(self):
         from radial.busqueda import sin_acentos
