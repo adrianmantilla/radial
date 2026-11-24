@@ -9,7 +9,7 @@ RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(RAIZ, "scripts"))
 
 from radial import ajustes as aj  # noqa: E402
-from radial import automatico, grabar, interruptores, paquete  # noqa: E402
+from radial import automatico, grabar, interruptores, paquete, reto  # noqa: E402
 from radial import radiales as rd  # noqa: E402
 from radial.biblioteca import CLASE, MIO, Biblioteca  # noqa: E402
 from radial.i18n import sinonimos  # noqa: E402
@@ -281,6 +281,34 @@ class PruebaPaquete(unittest.TestCase):
         self.assertEqual(self.ajustes.forma, "radial")
         self.assertFalse(self.ajustes.aprendizaje)
         self.assertEqual(paquete.fijadas_de_carpeta(os.path.join(self.tmp.name, "no_existe")), {})
+
+
+class PruebaReto(unittest.TestCase):
+    def test_de_qt(self):
+        self.assertEqual(reto.de_qt("Ctrl+Shift+E", mac=False), "Ctrl+Mayús+E")
+        self.assertEqual(reto.de_qt("Ctrl+E", mac=True), "Cmd+E")
+        self.assertEqual(reto.de_qt("Meta+Alt+E", mac=True), "Ctrl+Alt+E")
+        self.assertEqual(reto.de_qt("W", mac=False), "W")
+        self.assertEqual(reto.de_qt("", mac=False), "")
+
+    def test_iguales(self):
+        self.assertTrue(reto.iguales("Ctrl+Alt+E", "Alt+Ctrl+e"))
+        self.assertFalse(reto.iguales("Ctrl+E", "Ctrl+Mayús+E"))
+        self.assertFalse(reto.iguales("", ""))
+
+    def test_preguntas(self):
+        import random
+        usos = {}
+        for _ in range(5):
+            reto.registrar_uso(usos, "PolyExtrude")
+        reto.registrar_uso(usos, "SinAtajo")
+        self.assertEqual(usos["PolyExtrude"], 5)
+        atajos = {"PolyExtrude": "Ctrl+E", "Duplicate": "Ctrl+D", "CenterPivot": "", "Undo": "Z"}
+        lista = reto.preguntas(usos, atajos, cantidad=2, azar=random.Random(1))
+        self.assertEqual(len(lista), 2)
+        self.assertIn(("PolyExtrude", "Ctrl+E"), lista)  # lo más usado entra siempre
+        self.assertNotIn("SinAtajo", [c for c, _ in lista])
+        self.assertEqual(reto.preguntas({}, {}), [])
 
 
 class PruebaGlosario(unittest.TestCase):

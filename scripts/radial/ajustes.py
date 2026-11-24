@@ -228,6 +228,14 @@ class Ajustes(object):
         self.datos["reglas"] = dict(valor)
 
     @property
+    def usos(self):
+        """Veces que se ha lanzado cada comando de Maya desde Radial: ``{comando: veces}``."""
+        valor = self.datos.get("usos")
+        if not isinstance(valor, dict):
+            valor = self.datos["usos"] = {}
+        return valor
+
+    @property
     def atajo(self):
         """Atajo de teclado opcional para el menú («Ctrl+Alt+R»), o ""."""
         valor = self.datos.get("atajo")

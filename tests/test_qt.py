@@ -806,6 +806,48 @@ class PruebaAyuda(unittest.TestCase):
         self.assertEqual(datos["descripcion"], "Pone el pivote en el centro.")
         self.assertEqual(len(datos["lineas"]), 2)
 
+    def test_tarjeta_con_icono_y_menu(self):
+        info = dict(busqueda.accion_de_comando("PolyExtrude", "Menu items.Edit Mesh", "", "Extruir"),
+                    menu="Edit Mesh › Extrude")
+        datos = ayuda.contenido({"texto": "Extruir", "tipo": "comando", "accion": "PolyExtrude"}, info,
+                                icono="malla")
+        self.assertEqual(datos["icono"], "malla")
+        self.assertIn("En Maya: Edit Mesh › Extrude", datos["lineas"])
+        self.assertNotIn("Edit Mesh", datos["subtitulo"])  # el menú ya sale abajo
+        menu = MenuRadial()
+        menu.usar_radial(rd.por_defecto())
+        menu.colocar(QtCore.QPoint(400, 300))
+        menu.show()
+        self.addCleanup(menu.close)
+        tarjeta = ayuda.TarjetaAyuda()
+        self.addCleanup(tarjeta.close)
+        tarjeta.mostrar(datos, menu)
+        self.assertFalse(tarjeta.icono.isHidden())
+        self.assertFalse(tarjeta.icono.pixmap().isNull())
+        tarjeta.mostrar(ayuda.contenido({"texto": "Hola", "tipo": "python", "accion": "print(1)"}), menu)
+        self.assertTrue(tarjeta.icono.isHidden())
+
+    def test_reto(self):
+        from radial import reto
+        lista = [("PolyExtrude", "Ctrl+E"), ("Duplicate", "Ctrl+D"), ("MoveTool", "W")]
+        dialogo = reto.dialogo(lista, lambda c: {"PolyExtrude": "Extruir"}.get(c, c))
+        self.addCleanup(dialogo.close)
+        self.assertIn("Extruir", dialogo.pregunta.text())
+        self.assertFalse(dialogo.responder("Ctrl+R"))
+        self.assertTrue(dialogo.responder("Ctrl+E"))
+        self.assertIsNone(dialogo.responder("Ctrl+E"))  # ya contestada: hay que pulsar Siguiente
+        dialogo.siguiente.click()
+        dialogo.saltar.click()
+        dialogo.siguiente.click()
+        # Con el teclado de verdad: la secuencia de Qt se traduce a como lo escribe Maya
+        dialogo.teclas.setKeySequence(QtGui.QKeySequence("W"))
+        dialogo._comprobar()
+        dialogo.siguiente.click()
+        self.assertEqual(dialogo.aciertos, 2)
+        self.assertIn("2 de 3", dialogo.pregunta.text())
+        self.assertIn("Duplicate (Ctrl+D)", dialogo.resultado.text())
+        dialogo.grab()
+
     def test_vacio_e_interruptor(self):
         self.assertIsNone(ayuda.contenido(rd.boton_vacio()))
         datos = ayuda.contenido(interruptores.boton("xray"), encendido=True)

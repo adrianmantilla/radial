@@ -4,7 +4,8 @@
 La tarjeta no recibe el ratón ni el teclado: solo se mira.
 """
 
-from radial.dibujo import COLOR_BORDE, COLOR_DETALLE, COLOR_TEXTO
+from radial import iconos
+from radial.dibujo import COLOR_BORDE, COLOR_DETALLE, COLOR_TEXTO, pixmap_icono
 from radial.i18n import t
 from radial.qt import QtCore, QtGui, QtWidgets, sigue_vivo
 
@@ -13,13 +14,15 @@ Qt = QtCore.Qt
 ANCHO = 280
 SEPARACION = 12
 RETARDO_MS = 350
+LADO_ICONO = 26
 
 
-def contenido(boton, info=None, encendido=None, opciones=False):
-    """Lo que dice la tarjeta del ``boton``: dict con titulo, subtitulo, descripcion y lineas.
+def contenido(boton, info=None, encendido=None, opciones=False, icono=""):
+    """Lo que dice la tarjeta del ``boton``: dict con titulo, subtitulo, descripcion, lineas e icono.
 
-    ``info`` es la acción del buscador para ese comando (traducción, ayuda, categoría y atajo),
-    ``encendido`` el estado si es un interruptor y ``opciones`` si tiene ventana de opciones.
+    ``info`` es la acción del buscador para ese comando (traducción, ayuda, categoría, menú y atajo),
+    ``encendido`` el estado si es un interruptor, ``opciones`` si tiene ventana de opciones e
+    ``icono`` el de la herramienta en Maya (si el botón no tiene uno propio).
     None si el botón no tiene nada que explicar.
     """
     if not boton or boton.get("tipo") in (None, "", "vacio"):
@@ -30,7 +33,7 @@ def contenido(boton, info=None, encendido=None, opciones=False):
     partes = []
     if tipo == "comando":
         partes.append(boton.get("accion", ""))
-        if info.get("categoria"):
+        if info.get("categoria") and not info.get("menu"):
             partes.append(info["categoria"])
     elif tipo in ("python", "mel", "estante", "carpeta"):
         partes.append(t("tipo_" + tipo))
@@ -42,11 +45,14 @@ def contenido(boton, info=None, encendido=None, opciones=False):
     if encendido is not None:
         lineas.append(t("aprendizaje_interruptor",
                         estado=t("aprendizaje_encendido") if encendido else t("aprendizaje_apagado")))
+    if info.get("menu"):
+        lineas.append(t("aprendizaje_menu", menu=info["menu"]))
     if info.get("atajo"):
         lineas.append(t("aprendizaje_atajo", atajo=info["atajo"]))
     if opciones:
         lineas.append(t("aprendizaje_opciones"))
-    return {"titulo": titulo, "subtitulo": subtitulo, "descripcion": descripcion, "lineas": lineas}
+    return {"titulo": titulo, "subtitulo": subtitulo, "descripcion": descripcion, "lineas": lineas,
+            "icono": boton.get("icono") or icono or ""}
 
 
 class TarjetaAyuda(QtWidgets.QWidget):
@@ -69,7 +75,20 @@ class TarjetaAyuda(QtWidgets.QWidget):
         self.subtitulo = self._etiqueta(10, False, COLOR_DETALLE)
         self.descripcion = self._etiqueta(11, False, COLOR_TEXTO)
         self.lineas = self._etiqueta(10, False, QtGui.QColor(127, 209, 166))
-        for etiqueta in (self.titulo, self.subtitulo, self.descripcion, self.lineas):
+        # Cabecera: el icono de la herramienta a la izquierda del título
+        self.icono = QtWidgets.QLabel()
+        self.icono.setFixedSize(LADO_ICONO, LADO_ICONO)
+        self.icono.setStyleSheet("background: transparent;")
+        cabecera = QtWidgets.QHBoxLayout()
+        cabecera.setSpacing(9)
+        cabecera.addWidget(self.icono, 0, Qt.AlignTop)
+        textos = QtWidgets.QVBoxLayout()
+        textos.setSpacing(1)
+        textos.addWidget(self.titulo)
+        textos.addWidget(self.subtitulo)
+        cabecera.addLayout(textos, 1)
+        capa.addLayout(cabecera)
+        for etiqueta in (self.descripcion, self.lineas):
             capa.addWidget(etiqueta)
         self.datos = None
         self._menu = None
@@ -97,6 +116,17 @@ class TarjetaAyuda(QtWidgets.QWidget):
         self.datos = datos
         self._menu = menu
         self.titulo.setText(datos["titulo"])
+        icono = datos.get("icono", "")
+        mapa = None
+        if icono:
+            try:
+                lado = LADO_ICONO if iconos.es_imagen(icono) else 18
+                mapa = pixmap_icono(icono, lado, self.devicePixelRatioF(), "#ececec")
+            except Exception:  # un icono que no se lee no impide la ayuda
+                mapa = None
+        if mapa is not None:
+            self.icono.setPixmap(mapa)
+        self.icono.setVisible(mapa is not None)
         for etiqueta, texto in ((self.subtitulo, datos["subtitulo"]), (self.descripcion, datos["descripcion"]),
                                 (self.lineas, "\n".join(datos["lineas"]))):
             etiqueta.setText(texto)

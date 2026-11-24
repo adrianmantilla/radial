@@ -21,7 +21,8 @@ COMANDO_CONFIGURAR = "RadialConfigurar"
 
 _estado = {"menu": None, "filtro": None, "ajustes": None, "biblioteca": None,
            "configurador": None, "ventana_ajustes": None, "gestor": None, "buscador": None,
-           "tarjeta": None, "reloj_automatico": None, "contexto": None, "fuentes": None,
+           "tarjeta": None, "reloj_automatico": None, "contexto": None, "fuentes": None, "atajos": None,
+           "reto": None,
            "reloj_gesto": None, "gesto": None}
 
 
@@ -860,12 +861,63 @@ def _al_sobre(boton, menu=None):
     from radial import acciones
     from radial.ayuda import contenido
     try:
-        datos = contenido(boton, _info_de(boton), acciones.estado(boton), _tiene_opciones(boton))
+        icono = _icono_de_comando(boton["accion"]) if boton.get("tipo") == "comando" else ""
+        datos = contenido(boton, _info_de(boton), acciones.estado(boton), _tiene_opciones(boton), icono)
     except Exception:  # la ayuda nunca debe romper el menú
         return
     menu = menu if menu is not None else _menu_flotante(crear=False)
     if menu:
         _tarjeta().mostrar(datos, menu)
+
+
+def _al_usar(boton):
+    """Cuenta los usos de cada comando; a las 3, 10 y 25 veces recuerda su atajo de teclado."""
+    if boton.get("tipo") != "comando":
+        return
+    from radial import reto
+    comando = boton.get("accion", "")
+    veces = reto.registrar_uso(ajustes().usos, comando)
+    ajustes().guardar()
+    if veces not in reto.AVISOS or not ajustes().aprendizaje:
+        return
+    atajo = _atajos().get(comando)
+    if atajo:
+        texto = t("reto_recuerda", nombre=_nombre_comando(comando), atajo=atajo)
+        try:
+            cmds.inViewMessage(assistMessage=texto, position="botCenter", fade=True, fadeStayTime=2500)
+        except Exception:
+            print("Radial: " + texto)
+
+
+def _atajos():
+    if _estado.get("atajos") is None:
+        try:
+            _estado["atajos"] = _fuentes().atajos()
+        except Exception:
+            _estado["atajos"] = {}
+    return _estado["atajos"]
+
+
+def _nombre_comando(comando):
+    """El nombre en el idioma del alumno si lo hay («Extruir»); si no, el de Maya («Poly Extrude»)."""
+    from radial import busqueda
+    traducido = sinonimos().get(comando, {}).get("es", "")
+    return traducido or busqueda.texto_de_comando(comando)
+
+
+def abrir_reto():
+    """Modo reto: pregunta los atajos de los comandos que más usas."""
+    from radial import reto
+    _estado["atajos"] = None  # por si se cambió algún atajo en Maya
+    lista = reto.preguntas(ajustes().usos, _atajos())
+    if not lista:
+        cmds.confirmDialog(title=t("reto_titulo"), message=t("reto_sin_atajos"), button=[t("boton_aceptar")])
+        return None
+    ventana = reto.dialogo(lista, _nombre_comando, padre=ventana_maya())
+    _estado["reto"] = ventana
+    ventana.show()
+    ventana.raise_()
+    return ventana
 
 
 def _apariencia_cambiada(apariencia):
@@ -910,7 +962,7 @@ def _cerrar_ventanas():
         tarjeta.hide()
         destruir(tarjeta)
     _estado["tarjeta"] = None
-    for clave in ("configurador", "ventana_ajustes", "gestor"):
+    for clave in ("configurador", "ventana_ajustes", "gestor", "reto"):
         ventana = _ventana(clave)
         if ventana:
             ventana.close()
@@ -1156,6 +1208,7 @@ def crear_menu():
     cmds.menuItem(label=t("menu_alternar"), command=lambda *_: alternar())
     cmds.menuItem(label=t("menu_configurar"), command=lambda *_: abrir_configurador())
     cmds.menuItem(label=t("menu_grabar"), command=lambda *_: crear_boton_de_lo_ultimo())
+    cmds.menuItem(label=t("menu_reto"), command=lambda *_: abrir_reto())
     cmds.menuItem(MENU_RADIALES, label=t("menu_radiales"), subMenu=True, tearOff=True,
                   postMenuCommand=_llenar_radiales)
     cmds.setParent("..", menu=True)
@@ -1190,6 +1243,9 @@ def iniciar():
         cargar_fijadas()
     except Exception as error:  # una carpeta de clase rota no impide que el plugin cargue
         cmds.warning(str(error))
+    from radial import acciones
+    if _al_usar not in acciones.oyentes:
+        acciones.oyentes.append(_al_usar)
     crear_menu()
     _crear_comandos()
     # Con Maya ya abierto, no a mitad del arranque.
@@ -1208,12 +1264,14 @@ def _iniciar_extra():
 
 def detener():
     """Lo llama el plugin al descargarse: quita el filtro, las ventanas y los menús."""
-    from radial import pill_extra
+    from radial import acciones, pill_extra
+    if _al_usar in acciones.oyentes:
+        acciones.oyentes.remove(_al_usar)
     pill_extra.detener()
     _quitar_filtro()
     _cerrar_ventanas()
     _destruir_menu_flotante()
     _destruir_buscador()
-    _estado.update(ajustes=None, biblioteca=None, fuentes=None)
+    _estado.update(ajustes=None, biblioteca=None, fuentes=None, atajos=None)
     if not cmds.about(batch=True):
         quitar_menu()

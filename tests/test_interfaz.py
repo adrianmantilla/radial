@@ -521,6 +521,28 @@ class PruebaInterfaz(unittest.TestCase):
         self.assertFalse(self.im.importar_paquete(ruta))
         self.assertTrue(self.cmds.warning.called)
 
+    def test_usos_y_reto(self):
+        from radial import acciones
+        self.assertIn(self.im._al_usar, acciones.oyentes)
+        self.im._estado["atajos"] = {"PolyExtrude": "Ctrl+E"}
+        self.cmds.runTimeCommand.side_effect = lambda *a, **k: [] if k.get("query") else True
+        boton = {"texto": "Extruir", "tipo": "comando", "accion": "PolyExtrude"}
+        for _ in range(3):
+            acciones.ejecutar(boton)
+        self.assertEqual(self.im.ajustes().usos["PolyExtrude"], 3)
+        self.assertTrue(self.cmds.inViewMessage.called)  # a la tercera recuerda el atajo
+        with mock.patch.object(self.im, "_atajos", return_value={"PolyExtrude": "Ctrl+E"}):
+            ventana = self.im.abrir_reto()
+        self.assertEqual(ventana.lista, [("PolyExtrude", "Ctrl+E")])
+        self.im.detener()
+        self.assertNotIn(self.im._al_usar, acciones.oyentes)
+        self.im.iniciar()
+
+    def test_reto_sin_atajos(self):
+        with mock.patch.object(self.im, "_atajos", return_value={}):
+            self.assertIsNone(self.im.abrir_reto())
+        self.assertTrue(self.cmds.confirmDialog.called)
+
     def test_volver_a_centrar(self):
         self.im._al_mover(QtCore.QPoint(10, 10))
         self.im.volver_a_centrar()

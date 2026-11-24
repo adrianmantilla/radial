@@ -215,5 +215,21 @@
   "paquete_exportado": "Radial: paquete de clase exportado en {ruta}. Compártelo o déjalo en la carpeta de clase.",
   "paquete_importado": "Radial: paquete «{nombre}» importado. Sus radiales ya son tuyos y sus opciones están aplicadas.",
   "ajustes_fijada": "Esta opción la ha fijado tu profesor en la carpeta de clase.",
-  "ajustes_fijadas_nota": "Tu profesor ha fijado algunas opciones en la carpeta de clase. Las tuyas vuelven si quitas la carpeta."
+  "ajustes_fijadas_nota": "Tu profesor ha fijado algunas opciones en la carpeta de clase. Las tuyas vuelven si quitas la carpeta.",
+  "aprendizaje_menu": "En Maya: {menu}",
+  "menu_reto": "Modo reto: practicar atajos...",
+  "reto_titulo": "Radial: modo reto",
+  "reto_ayuda": "Pulsa el atajo de teclado de esta herramienta en Maya.",
+  "reto_pregunta": "¿Cuál es el atajo de «{nombre}»?",
+  "reto_progreso": "Pregunta {numero} de {total} · {aciertos} aciertos",
+  "reto_bien": "¡Bien! Es {atajo}.",
+  "reto_mal": "{pulsado} no es. Prueba otra vez.",
+  "reto_era": "Era {atajo}.",
+  "reto_saltar": "No lo sé",
+  "reto_siguiente": "Siguiente",
+  "reto_final": "Has acertado {aciertos} de {total}.",
+  "reto_repasar": "Para repasar: {lista}",
+  "reto_perfecto": "¡Perfecto! Ya no necesitas el menú para estas.",
+  "reto_sin_atajos": "Aún no hay herramientas con atajo que practicar. Usa el menú un poco y vuelve.",
+  "reto_recuerda": "«{nombre}» también es {atajo} en el teclado."
 }
