@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.join(RAIZ, "scripts"))
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 try:
-    from PySide6 import QtCore, QtWidgets
+    from PySide6 import QtCore, QtGui, QtWidgets
 except ImportError:  # pragma: no cover
     QtWidgets = None
 
@@ -266,6 +266,9 @@ class PruebaInterfaz(unittest.TestCase):
         self.im.cambiar_extra("apariencia", {"pill_boton": 40, "opacidad": 0.5})
         self.assertEqual(extra.pill(crear=False).apariencia["pill_boton"], 40)
         self.assertNotEqual(self.im.radial_activo()["apariencia"]["opacidad"], 0.5)
+        self.im.cambiar_extra("cantidad", 9)
+        self.assertEqual(extra.pill(crear=False).num(), 9)
+        self.assertEqual(len(self.im.radial_activo()["botones"]), 6)
         self.im.cambiar_extra("vertical", True)
         menu = extra.pill(crear=False)
         self.assertTrue(menu.vertical)
@@ -303,10 +306,13 @@ class PruebaInterfaz(unittest.TestCase):
         self.assertFalse(ventana.extra_controles.isEnabled())
         ventana.extra_activa.setChecked(True)
         self.assertTrue(self._extra().visible())
+
         indice = ventana.extra_radial.findData("pre:2_uv_texturas")
         ventana.extra_radial.setCurrentIndex(indice)
         ventana.extra_radial.activated.emit(indice)
         self.assertEqual(self._extra().biblioteca().origen, "pre:2_uv_texturas")
+        ventana.extra_cantidad.setValue(4)
+        self.assertEqual(self._extra().pill(crear=False).num(), 4)
 
     def test_icono_de_cada_herramienta(self):
         self.cmds.runTimeCommand.side_effect = lambda *a, **k: (
@@ -315,6 +321,278 @@ class PruebaInterfaz(unittest.TestCase):
             ["polyExtrudeFacet.png"] if k.get("nameFilter") == "polyExtrudeFacet.png" else [])
         self.assertEqual(self.im._icono_de_comando("PolyExtrude"), ":/polyExtrudeFacet.png")
         self.assertEqual(self.im._icono_de_comando("NoTieneIcono"), "")
+
+    def test_gesto_ejecuta_y_cierra(self):
+        filtro = self.im._estado["filtro"]
+        filtro.manteniendo = True
+        with mock.patch.object(QtGui.QCursor, "pos", staticmethod(lambda: QtCore.QPoint(-3000, -3000))):
+            self.im._al_doble_tab()
+            self.assertTrue(self.im.visible())
+            self.assertIsNotNone(self.im._estado["gesto"])
+        # Se mueve hacia abajo: botón 4 del radial (índice 3)
+        with mock.patch.object(QtGui.QCursor, "pos", staticmethod(lambda: QtCore.QPoint(-3000, -2900))):
+            self.im._seguir_gesto()
+            self.assertEqual(self.im._menu_flotante(crear=False)._sobre, 3)
+            filtro.manteniendo = False
+            self.im._al_soltar_tab()
+        esperado = self.im.radial_activo()["botones"][3]
+        self.assertFalse(self.im.visible())
+        self.assertTrue(self.cmds.method_calls or sys.modules["maya.mel"].eval.called, esperado)
+
+    def test_soltar_sin_moverse_deja_el_menu(self):
+        filtro = self.im._estado["filtro"]
+        filtro.manteniendo = True
+        with mock.patch.object(QtGui.QCursor, "pos", staticmethod(lambda: QtCore.QPoint(-3000, -3000))):
+            self.im._al_doble_tab()
+            filtro.manteniendo = False
+            self.im._al_soltar_tab()
+        self.assertTrue(self.im.visible())
+
+    def test_numero_de_botones_del_menu(self):
+        self.im.mostrar()
+        ventana = self.im.abrir_ajustes()
+        ventana.cantidad.setValue(8)
+        self.assertEqual(len(self.im.radial_activo()["botones"]), 8)
+        self.assertEqual(self.im._menu_flotante(crear=False).num(), 8)
+        self.assertTrue(self.im.biblioteca().sin_guardar)
+
+    def test_atajo_de_teclado(self):
+        self.cmds.hotkeySet.side_effect = lambda *a, **k: "Maya_Default" if k.get("current") and k.get("query") \
+            else False
+        self.cmds.hotkeyCheck.side_effect = lambda **k: "PolyExtrude" if k.get("keyString") == "e" else ""
+        self.assertEqual(self.im.cambiar_atajo("Ctrl+Alt+R"), "")
+        self.assertEqual(self.im.ajustes().atajo, "Ctrl+Alt+R")
+        self.assertTrue(self.cmds.hotkey.called)
+        self.cmds.hotkeySet.assert_any_call("Radial", source="Maya_Default", current=True)
+        self.assertIn("PolyExtrude", self.im.cambiar_atajo("Ctrl+E"))  # no pisa los de Maya
+        self.assertEqual(self.im.ajustes().atajo, "Ctrl+Alt+R")
+        self.assertTrue(self.im.cambiar_atajo("R"))  # sin modificador no vale
+        self.assertEqual(self.im.cambiar_atajo(""), "")
+        self.assertEqual(self.im.ajustes().atajo, "")
+
+    def test_boton_con_lo_ultimo_que_hice(self):
+        from radial import grabar
+        registro = "polyExtrudeFacet -ltz 0.5 pCube1.f[1];\npolyBevel3 -fraction 0.2 pCube1.e[4];\n"
+        vistos = []
+
+        def aceptar(dialogo):
+            vistos.append(dialogo)
+            self.assertEqual(dialogo.elegidas(), ["polyBevel3 -fraction 0.2 pCube1.e[4];"])
+            dialogo.lista.item(0).setCheckState(QtCore.Qt.Checked)
+            dialogo.nombre.setText("Extruir y biselar")
+            return True
+
+        vacios = [i for i, b in enumerate(self.im.radial_activo()["botones"]) if b["tipo"] == "vacio"]
+        if not vacios:
+            radial = self.im.radial_activo()
+            radial["botones"][5] = {"tipo": "vacio"}
+            self.im.modificar_radial(radial)
+            vacios = [5]
+        with mock.patch.object(grabar, "registro_maya", return_value=registro), \
+                mock.patch.object(self.im, "_ejecutar_dialogo", side_effect=aceptar):
+            self.assertTrue(self.im.crear_boton_de_lo_ultimo())
+        self.assertEqual(vistos[0].hueco.currentData(), vacios[0])  # el primer hueco libre
+        boton = self.im.radial_activo()["botones"][vacios[0]]
+        self.assertEqual(boton["texto"], "Extruir y biselar")
+        self.assertEqual(boton["accion"].splitlines(), registro.splitlines())
+        self.assertTrue(self.im.biblioteca().sin_guardar)
+
+    def test_boton_con_lo_ultimo_sin_ordenes(self):
+        from radial import grabar
+        with mock.patch.object(grabar, "registro_maya", return_value="// nada //"), \
+                mock.patch.object(self.im, "_ejecutar_dialogo") as ejecutar:
+            self.assertFalse(self.im.crear_boton_de_lo_ultimo())
+        ejecutar.assert_not_called()
+        self.assertTrue(self.cmds.confirmDialog.called)
+
+    def test_menus_de_maya_en_el_buscador(self):
+        from radial import fuentes_maya
+
+        class Menus(object):
+            """Un menú «Modify» con un submenú, un divisor, una caja de opciones y una orden en Python."""
+            items = {
+                "MayaWindow|mainModifyMenu": ["m1", "m2", "m3", "m4", "m5"],
+                "MayaWindow|mainModifyMenu|m4": ["s1"],
+            }
+            datos = {
+                "m1": dict(label="Centrar pivote", runTimeCommand="CenterPivot"),
+                "m2": dict(divider=True),
+                "m3": dict(label="", optionBox=True),
+                "m4": dict(label="Pivot", subMenu=True),
+                "m5": dict(label="Mi orden...", command="print('hola')", sourceType="python"),
+                "s1": dict(label="Bake Pivot", command="BakeCustomToolPivot;"),
+            }
+
+            def window(self, nombre, **k):
+                return ["mainModifyMenu"]
+
+            def menu(self, nombre, **k):
+                if k.get("label"):
+                    return "&Modify"
+                if k.get("itemArray"):
+                    return []  # todavía sin crear: hay que llamar a su postMenuCommand
+                if k.get("postMenuCommand"):
+                    return "buildModifyMenu MayaWindow|mainModifyMenu"
+                return None
+
+            def menuItem(self, nombre, **k):
+                if k.get("itemArray"):
+                    return Menus.items.get(nombre, [])
+                propio = Menus.datos[nombre.split("|")[-1]]
+                for clave in k:
+                    if clave != "query":
+                        return propio.get(clave, "" if clave not in ("divider", "optionBox", "subMenu")
+                                          else False)
+
+        construidos = []
+        falsos = Menus()
+        original = falsos.menu
+
+        def menu(nombre, **k):
+            if k.get("itemArray") and construidos:
+                return Menus.items[nombre]
+            return original(nombre, **k)
+
+        falsos.menu = menu
+        mel = mock.MagicMock()
+        mel.eval.side_effect = construidos.append
+        with mock.patch.object(fuentes_maya, "cmds", falsos), mock.patch.object(fuentes_maya, "mel", mel):
+            menus = fuentes_maya.FuentesMaya().menus()
+        self.assertEqual(construidos, ["buildModifyMenu MayaWindow|mainModifyMenu"])
+        self.assertEqual([(r, e, b["tipo"], b["accion"]) for r, e, b in menus], [
+            (["Modify"], "Centrar pivote", "comando", "CenterPivot"),
+            (["Modify", "Pivot"], "Bake Pivot", "mel", "BakeCustomToolPivot;"),
+            (["Modify"], "Mi orden", "python", "print('hola')"),
+        ])
+
+    def test_scripts_propios_en_el_buscador(self):
+        from radial import fuentes_maya
+        for archivo in ("limpiar.py", "renombrar.mel", "userSetup.py", "notas.txt"):
+            open(os.path.join(self.tmp.name, archivo), "w").close()
+        rutas = fuentes_maya.FuentesMaya().scripts()
+        self.assertEqual([os.path.basename(r) for r in rutas], ["limpiar.py", "renombrar.mel"])
+        acciones = self.im._acciones_buscador()
+        self.assertIn("Mis scripts", [a["categoria"] for a in acciones])
+
+    def test_favoritas_se_guardan(self):
+        from radial import busqueda
+        accion = busqueda.accion_de_comando("CenterPivot")
+        self.im._alternar_favorito(accion)
+        self.assertEqual([a["nombre"] for a in self.im.ajustes().favoritos], ["CenterPivot"])
+        self.im._alternar_favorito(accion)
+        self.assertEqual(self.im.ajustes().favoritos, [])
+
+    def test_paquete_de_clase(self):
+        from radial import paquete, pill_extra
+        ruta = os.path.join(self.tmp.name, "clase", "modelado.radialclase")
+        self.im.cambiar_forma("pill", True)
+        pill_extra.activar(True)
+        pill_extra.cambiar_cantidad(3)
+        self.cmds.confirmDialog.side_effect = lambda **k: k["button"][0]  # «Fijar opciones»
+        self.cmds.fileDialog2.return_value = [ruta]
+        self.assertEqual(self.im.exportar_paquete(), ruta)
+        self.assertEqual(paquete.leer(ruta)["fijas"], list(paquete.OPCIONES))
+        # Un alumno con otras opciones lo importa
+        self.im.cambiar_forma("radial")
+        pill_extra.activar(False)
+        self.assertTrue(self.im.importar_paquete(ruta))
+        self.assertEqual((self.im.ajustes().forma, self.im.ajustes().pill_vertical), ("pill", True))
+        self.assertTrue(self.im.biblioteca().origen.startswith("mio:"))
+        self.assertTrue(pill_extra.ajustes().activa)
+        self.assertEqual(len(pill_extra.biblioteca().activo["botones"]), 3)
+        # En la carpeta de clase, las opciones quedan fijadas y bloqueadas en Ajustes
+        self.im.cambiar_forma("radial")
+        self.im.cambiar_opcion("carpeta_clase", os.path.dirname(ruta))
+        self.assertEqual(self.im.ajustes().forma, "pill")
+        ventana = self.im.abrir_ajustes()
+        self.assertFalse(ventana.forma_radial.isEnabled())
+        self.assertFalse(ventana.velocidad.isEnabled())
+        self.assertTrue(ventana.forma_pill.isChecked())
+        self.assertFalse(ventana.nota_fijadas.isHidden())
+        self.assertTrue(ventana.cantidad.isEnabled())  # lo demás sigue libre
+        self.im.cambiar_opcion("carpeta_clase", "")
+        self.assertEqual(self.im.ajustes().forma, "radial")
+        self.assertTrue(ventana.forma_radial.isEnabled())
+
+    def test_paquete_roto(self):
+        ruta = os.path.join(self.tmp.name, "roto.radialclase")
+        with open(ruta, "w") as f:
+            f.write("{}")
+        self.assertFalse(self.im.importar_paquete(ruta))
+        self.assertTrue(self.cmds.warning.called)
+
+    def test_usos_y_reto(self):
+        from radial import acciones
+        self.assertIn(self.im._al_usar, acciones.oyentes)
+        self.im._estado["atajos"] = {"PolyExtrude": "Ctrl+E"}
+        self.cmds.runTimeCommand.side_effect = lambda *a, **k: [] if k.get("query") else True
+        boton = {"texto": "Extruir", "tipo": "comando", "accion": "PolyExtrude"}
+        for _ in range(3):
+            acciones.ejecutar(boton)
+        self.assertEqual(self.im.ajustes().usos["PolyExtrude"], 3)
+        self.assertTrue(self.cmds.inViewMessage.called)  # a la tercera recuerda el atajo
+        with mock.patch.object(self.im, "_atajos", return_value={"PolyExtrude": "Ctrl+E"}):
+            ventana = self.im.abrir_reto()
+        self.assertEqual(ventana.lista, [("PolyExtrude", "Ctrl+E")])
+        self.im.detener()
+        self.assertNotIn(self.im._al_usar, acciones.oyentes)
+        self.im.iniciar()
+
+    def test_reto_sin_atajos(self):
+        with mock.patch.object(self.im, "_atajos", return_value={}):
+            self.assertIsNone(self.im.abrir_reto())
+        self.assertTrue(self.cmds.confirmDialog.called)
+
+    def test_aspecto(self):
+        from radial import dibujo, i18n, tema
+        self.addCleanup(tema.aplicar, "oscuro", "")
+        self.addCleanup(i18n.usar_idioma, "es")
+        self.im.mostrar()
+        menu_antes = self.im._menu_flotante(crear=False)
+        ventana = self.im.abrir_ajustes()
+        ventana.tema_claro.setChecked(True)
+        self.assertEqual(self.im.ajustes().tema, "claro")
+        self.assertGreater(dibujo.COLOR_FONDO.lightness(), 200)
+        menu = self.im._menu_flotante(crear=False)
+        self.assertIsNot(menu, menu_antes)  # se rehace con los colores nuevos
+        self.assertTrue(self.im.visible())
+        ventana.muestras["#ff6b9a"].click()
+        self.assertEqual(self.im.ajustes().acento, "#ff6b9a")
+        self.assertTrue(ventana.muestras["#ff6b9a"].isChecked())
+        self.assertEqual(dibujo.COLOR_ABIERTO.name(), "#ff6b9a")
+        # Idioma: el menú de Maya se rehace en inglés y la ventana vuelve a abrirse
+        ventana.idioma.setCurrentIndex(ventana.idioma.findData("en"))
+        self.assertEqual(self.im.ajustes().idioma, "en")
+        self.assertEqual(i18n.t("menu_ajustes"), "Settings...")
+        self.cmds.menuItem.assert_any_call(label="Settings...", command=mock.ANY)
+        self.app.processEvents()
+        nueva = self.im._ventana("ventana_ajustes")
+        self.assertIsNotNone(nueva)
+        self.assertEqual(nueva.windowTitle(), "Radial · Settings")
+
+    def test_iconos_de_radial_o_de_maya(self):
+        from radial import iconos
+        self.addCleanup(iconos.usar_iconos, "propios")
+        boton = {"texto": "Extruir", "tipo": "comando", "accion": "PolyExtrude", "icono": ""}
+        self.assertEqual(self.im.ajustes().iconos, "propios")  # por defecto, los del plugin
+        self.assertEqual(iconos.de_boton(boton), "extruir")
+        self.im.mostrar()
+        ventana = self.im.abrir_ajustes()
+        self.assertTrue(ventana.iconos_propios.isChecked())
+        with mock.patch.object(self.im, "_icono_de_comando",
+                               side_effect=lambda c: ":/polyExtrude.png" if c == "PolyExtrude" else ""):
+            iconos.usar_iconos("propios", self.im._icono_de_comando)
+            ventana.iconos_maya.setChecked(True)
+            self.assertEqual(self.im.ajustes().iconos, "maya")
+            self.assertEqual(iconos.de_boton(boton), ":/polyExtrude.png")
+            # Sin icono de Maya, el del plugin; uno elegido a mano no se toca
+            from radial import iconos_acciones
+            self.assertEqual(iconos.de_boton(dict(boton, accion="CenterPivot")),
+                             iconos_acciones.icono_de_comando("CenterPivot"))
+            self.assertEqual(iconos.de_boton(dict(boton, icono="cubo")), "cubo")
+            self.assertTrue(self.im.visible())
+            ventana.iconos_propios.setChecked(True)
+            self.assertEqual(iconos.de_boton(boton), "extruir")
 
     def test_volver_a_centrar(self):
         self.im._al_mover(QtCore.QPoint(10, 10))

@@ -6,6 +6,7 @@ Necesitan PySide6 (``pip install PySide6-Essentials``); si no está, se saltan.
 import os
 import sys
 import unittest
+import unittest.mock
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(RAIZ, "scripts"))
@@ -77,6 +78,26 @@ class PruebaFiltro(unittest.TestCase):
         self.assertEqual(_tecla(self.destino, 1180), set())        # el segundo no llega
         self._procesar()
         self.assertEqual(self.avisos, [1])
+
+    def test_mantener_el_segundo_tab_es_un_gesto(self):
+        soltados = []
+        self.filtro._al_soltar_tab = lambda: soltados.append(1)
+        _tecla(self.destino, 1000)
+        self.assertEqual(_tecla(self.destino, 1180), set())
+        self.assertTrue(self.filtro.manteniendo)
+        # La auto-repetición y el soltar de ese Tab no llegan a Maya
+        self.assertEqual(_tecla(self.destino, 1700, repetida=True), set())
+        for repetida in (True, False):
+            evento = QtGui.QKeyEvent(QEvent.KeyRelease, Qt.Key_Tab, Qt.NoModifier, "\t", repetida)
+            self.assertTrue(self.filtro.eventFilter(self.destino, evento))
+        self._procesar()
+        self.assertFalse(self.filtro.manteniendo)
+        self.assertEqual(soltados, [1])
+        # Después, mantener Tab vuelve a ser de Maya
+        self.assertEqual(len(_tecla(self.destino, 5000)), 2)
+        self.assertEqual(len(_tecla(self.destino, 5400, repetida=True)), 2)
+        evento = QtGui.QKeyEvent(QEvent.KeyRelease, Qt.Key_Tab, Qt.NoModifier, "\t", False)
+        self.assertFalse(self.filtro.eventFilter(self.destino, evento))
 
     def test_dos_tab_lentos_llegan_los_dos(self):
         self.assertEqual(len(_tecla(self.destino, 1000)), 2)
@@ -187,6 +208,19 @@ class PruebaMenu(unittest.TestCase):
         self.assertEqual(self.menu.centro_global() - antes, QtCore.QPoint(120, 40))
         self.assertEqual(self.movidos, [self.menu.centro_global()])
         self.assertEqual(self.ejecutados, [])
+
+    def test_gesto_por_direccion(self):
+        inicio = QtCore.QPoint(0, 0)
+        self.assertIsNone(self.menu._direccion(5, 5))  # sin moverse no hay botón
+        self.assertEqual(self.menu._direccion(0, -80), 0)   # arriba
+        self.assertEqual(self.menu._direccion(0, 80), 3)    # abajo
+        self.assertEqual(self.menu._direccion(70, -40), 1)  # arriba a la derecha
+        lejos = self.menu.mapToGlobal(QtCore.QPoint(-500, -500))
+        self.assertIsNone(self.menu.boton_en_gesto(lejos, lejos))
+        punto = self.menu.mapToGlobal(self._punto_boton(4))
+        self.assertEqual(self.menu.boton_en_gesto(inicio, punto), 4)  # el que está bajo el ratón
+        self.menu.marcar_gesto(4)
+        self.assertEqual(self.menu._sobre, 4)
 
     def test_clic_derecho_en_el_centro_configura(self):
         self._raton(QEvent.MouseButtonPress, self._centro(), Qt.RightButton)
@@ -377,6 +411,23 @@ class PruebaBuscador(unittest.TestCase):
         evento = QtGui.QKeyEvent(QEvent.KeyPress, tecla, Qt.NoModifier)
         APP.sendEvent(self.buscador.campo, evento)
 
+    def test_la_lista_nunca_tapa_la_barra(self):
+        self.menu.show()
+        APP.processEvents()
+        zona = QtGui.QGuiApplication.primaryScreen().availableGeometry()
+        for y in (200, zona.bottom() - 330, zona.bottom() - 200):
+            self.menu.colocar(QtCore.QPoint(500, y))
+            self.buscador.colocar()
+            self._escribir("e")
+            APP.processEvents()
+            barra = self.buscador.geometry()
+            lista = self.buscador.lista.geometry()
+            self.assertFalse(barra.intersects(lista), (y, barra, lista))
+            self.assertLessEqual(lista.bottom(), zona.bottom())
+        # Moverse con la lista abierta la lleva con la barra
+        self.buscador.move(self.buscador.pos() + QtCore.QPoint(0, -40))
+        self.assertFalse(self.buscador.geometry().intersects(self.buscador.lista.geometry()))
+
     def test_sigue_al_menu(self):
         self.assertFalse(self.buscador.isVisible())
         self.menu.show()
@@ -449,6 +500,34 @@ class PruebaBuscador(unittest.TestCase):
         self._escribir("")
         self.assertEqual(self.buscador.lista.titulo, "Usadas hace poco")
 
+    def test_estrella_de_favoritas(self):
+        favoritos = []
+        acciones = [busqueda.accion_de_comando(*c) for c in FuentesFalsas().comandos()]
+        buscador = Buscador(lambda: acciones, self.ejecutadas.append, recientes=lambda: self.recientes,
+                            favoritos=lambda: favoritos,
+                            al_favorito=lambda a: favoritos.__setitem__(
+                                slice(None), busqueda.alternar_favorito(favoritos, a)))
+        self.addCleanup(buscador.close)
+        buscador.campo.setText("pivot")
+        buscador.campo.textEdited.emit("pivot")
+        lista = buscador.lista
+        lista.setFixedWidth(360)
+        estrella = lista.zona_estrella(0).center().toPoint()
+        _clic(lista, estrella)
+        self.assertEqual(self.ejecutadas, [])  # la estrella no ejecuta
+        self.assertEqual([a["nombre"] for a in favoritos], ["CenterPivot"])
+        self.assertTrue(lista.es_favorita(lista.acciones[0]))
+        lista.grab()
+        # Sin texto salen primero las favoritas
+        self.recientes.append(busqueda.accion_de_comando("PolyExtrude"))
+        buscador.campo.setText("")
+        buscador.campo.textEdited.emit("")
+        self.assertEqual([a["nombre"] for a in lista.acciones], ["CenterPivot", "PolyExtrude"])
+        self.assertEqual(lista.titulo, "Favoritas · Usadas hace poco")
+        _clic(lista, lista.zona_estrella(0).center().toPoint())
+        self.assertEqual(favoritos, [])
+        self.assertEqual(lista.titulo, "Usadas hace poco")
+
     def test_clic_en_resultado(self):
         self._escribir("pivot")
         lista = self.buscador.lista
@@ -491,6 +570,30 @@ class PruebaSoltar(unittest.TestCase):
         datos = QtCore.QMimeData()
         datos.setText("hola")
         self.assertIsNone(arrastre.boton_de(datos))
+
+    def test_codigo_de_un_estante(self):
+        mel = QtCore.QMimeData()
+        mel.setText("polyCube -w 2;")
+        self.assertEqual(arrastre.boton_de(mel)["tipo"], "mel")
+        self.assertEqual(arrastre.boton_de(mel)["texto"], "polyCube")
+        maya = QtCore.QMimeData()
+        maya.setData("application/x-maya-data", QtCore.QByteArray(b"import maya.cmds as cmds\ncmds.polySphere()"))
+        boton = arrastre.boton_de(maya)
+        self.assertEqual(boton["tipo"], "python")
+
+    def test_arrastrar_un_boton_del_menu(self):
+        menu = MenuRadial(al_ejecutar=lambda i, opciones=False: None, al_mover=lambda c: None,
+                          al_configurar=lambda: None)
+        menu.usar_radial(rd.por_defecto())
+        menu.show()
+        self.addCleanup(menu.close)
+        lanzados = []
+        with unittest.mock.patch.object(QtGui.QDrag, "exec", lambda d, *a: lanzados.append(d.mimeData())):
+            menu._pulsado, menu._inicio_pulsado = 0, QtCore.QPoint(10, 10)
+            evento = QtGui.QMouseEvent(QEvent.MouseMove, QtCore.QPointF(60, 60), QtCore.QPointF(60, 60),
+                                       Qt.NoButton, Qt.LeftButton, Qt.NoModifier)
+            self.assertTrue(menu._arrastrar_boton(evento))
+        self.assertEqual(arrastre.boton_de(lanzados[0])["texto"], rd.por_defecto()["botones"][0]["texto"])
 
 
 @unittest.skipIf(QtWidgets is None, "PySide6 no está instalado")
@@ -576,6 +679,27 @@ class PruebaCarpetasYEstados(unittest.TestCase):
     def test_al_sobre(self):
         _clic(self.menu, self._punto(1))
         self.assertEqual(self.sobre[0]["texto"], self.menu.botones_visibles()[1]["texto"])
+
+    def test_pill_con_nueve_botones(self):
+        pill = MenuPill(al_ejecutar=lambda i, opciones=False: self.ejecutados.append((i, opciones)),
+                        al_mover=lambda c: None, al_configurar=lambda: None, vertical=False)
+        self.addCleanup(pill.close)
+        seis = pill.width()
+        radial = rd.cambiar_cantidad(_radial_con_carpeta(), 9)
+        radial["botones"][8] = {"texto": "Nueve", "tipo": "mel", "accion": "polyCube;"}
+        pill.usar_radial(radial)
+        pill.show()
+        self.assertEqual(pill.num(), 9)
+        self.assertGreater(pill.width(), seis)
+        x, y, w, h = rd.geometria_pill(pill.apariencia, False, 9)[3][8]
+        _clic(pill, QtCore.QPoint(int(1 + x + w / 2), int(1 + y + h / 2)))
+        self.assertEqual(self.ejecutados[-1], (8, False))
+        pill.fijar_estados([True] * 9)
+        pill.abrir_carpeta(5)
+        self.assertEqual(len(pill.botones_visibles()), 9)  # la carpeta rellena con huecos vacíos
+        self.assertFalse(pill.grab().isNull())
+        pill.usar_radial(rd.cambiar_cantidad(radial, 3))
+        self.assertEqual(len(pill.estados), 3)
 
     def test_pill_con_carpeta(self):
         pill = MenuPill(al_ejecutar=lambda i, opciones=False: None, al_mover=lambda c: None,
@@ -671,6 +795,47 @@ class PruebaOpcionesAjustes(unittest.TestCase):
 
 
 @unittest.skipIf(QtWidgets is None, "PySide6 no está instalado")
+class PruebaTema(unittest.TestCase):
+    def tearDown(self):
+        from radial import tema
+        tema.aplicar("oscuro", "")
+
+    def test_claro_y_acento(self):
+        from radial import buscador, dibujo, menu_pill, tema
+        oscuro_fondo = dibujo.COLOR_FONDO.getRgb()
+        self.assertTrue(tema.aplicar("claro", ""))
+        self.assertGreater(dibujo.COLOR_FONDO.lightness(), 200)
+        self.assertLess(dibujo.COLOR_TEXTO.lightness(), 60)
+        self.assertEqual(menu_pill.COLOR_ICONO_CLARO, "#1c1c1f")  # iconos oscuros sobre la pill clara
+        self.assertFalse(tema.aplicar("claro", ""))  # nada cambia
+        tema.aplicar("claro", "#FF9F43")
+        self.assertEqual(dibujo.COLOR_ABIERTO.name(), "#ff9f43")
+        self.assertEqual(buscador.COLOR_ELEGIDO.name(), "#ff9f43")
+        self.assertEqual(dibujo.COLOR_ICONO_OSCURO, "#141414")  # sobre naranja, icono oscuro
+        tema.aplicar("oscuro", "#4c3cff")
+        self.assertEqual(dibujo.COLOR_ICONO_OSCURO, "#f4f4f4")  # sobre un azul oscuro, icono claro
+        tema.aplicar("oscuro", "no es un color")
+        self.assertEqual(dibujo.COLOR_FONDO.getRgb(), oscuro_fondo)
+        self.assertEqual(dibujo.COLOR_ABIERTO.name(), "#f4f4f4")
+        # Se dibuja con los dos temas
+        for nombre in tema.TEMAS:
+            tema.aplicar(nombre, "#36c28a")
+            for clase in (MenuRadial, MenuPill):
+                menu = clase()
+                menu.usar_radial(rd.por_defecto())
+                self.addCleanup(menu.close)
+                self.assertFalse(menu.grab().isNull())
+
+    def test_valores(self):
+        from radial import tema
+        self.assertEqual(tema.normalizar_tema("rosa"), "oscuro")
+        self.assertEqual(tema.normalizar_acento("#ABCDEF"), "#abcdef")
+        self.assertEqual(tema.normalizar_acento("#abc"), "")
+        self.assertEqual(tema.texto_sobre("#ffffff"), "#141414")
+        self.assertEqual(tema.texto_sobre("#101010"), "#f4f4f4")
+
+
+@unittest.skipIf(QtWidgets is None, "PySide6 no está instalado")
 class PruebaAyuda(unittest.TestCase):
     def test_contenido_de_comando(self):
         info = busqueda.accion_de_comando("CenterPivot", "Menu items.Modify", "", "Centrar pivote",
@@ -681,6 +846,48 @@ class PruebaAyuda(unittest.TestCase):
         self.assertIn("CenterPivot", datos["subtitulo"])
         self.assertEqual(datos["descripcion"], "Pone el pivote en el centro.")
         self.assertEqual(len(datos["lineas"]), 2)
+
+    def test_tarjeta_con_icono_y_menu(self):
+        info = dict(busqueda.accion_de_comando("PolyExtrude", "Menu items.Edit Mesh", "", "Extruir"),
+                    menu="Edit Mesh › Extrude")
+        datos = ayuda.contenido({"texto": "Extruir", "tipo": "comando", "accion": "PolyExtrude"}, info,
+                                icono="malla")
+        self.assertEqual(datos["icono"], "malla")
+        self.assertIn("En Maya: Edit Mesh › Extrude", datos["lineas"])
+        self.assertNotIn("Edit Mesh", datos["subtitulo"])  # el menú ya sale abajo
+        menu = MenuRadial()
+        menu.usar_radial(rd.por_defecto())
+        menu.colocar(QtCore.QPoint(400, 300))
+        menu.show()
+        self.addCleanup(menu.close)
+        tarjeta = ayuda.TarjetaAyuda()
+        self.addCleanup(tarjeta.close)
+        tarjeta.mostrar(datos, menu)
+        self.assertFalse(tarjeta.icono.isHidden())
+        self.assertFalse(tarjeta.icono.pixmap().isNull())
+        tarjeta.mostrar(ayuda.contenido({"texto": "Hola", "tipo": "python", "accion": "print(1)"}), menu)
+        self.assertTrue(tarjeta.icono.isHidden())
+
+    def test_reto(self):
+        from radial import reto
+        lista = [("PolyExtrude", "Ctrl+E"), ("Duplicate", "Ctrl+D"), ("MoveTool", "W")]
+        dialogo = reto.dialogo(lista, lambda c: {"PolyExtrude": "Extruir"}.get(c, c))
+        self.addCleanup(dialogo.close)
+        self.assertIn("Extruir", dialogo.pregunta.text())
+        self.assertFalse(dialogo.responder("Ctrl+R"))
+        self.assertTrue(dialogo.responder("Ctrl+E"))
+        self.assertIsNone(dialogo.responder("Ctrl+E"))  # ya contestada: hay que pulsar Siguiente
+        dialogo.siguiente.click()
+        dialogo.saltar.click()
+        dialogo.siguiente.click()
+        # Con el teclado de verdad: la secuencia de Qt se traduce a como lo escribe Maya
+        dialogo.teclas.setKeySequence(QtGui.QKeySequence("W"))
+        dialogo._comprobar()
+        dialogo.siguiente.click()
+        self.assertEqual(dialogo.aciertos, 2)
+        self.assertIn("2 de 3", dialogo.pregunta.text())
+        self.assertIn("Duplicate (Ctrl+D)", dialogo.resultado.text())
+        dialogo.grab()
 
     def test_vacio_e_interruptor(self):
         self.assertIsNone(ayuda.contenido(rd.boton_vacio()))

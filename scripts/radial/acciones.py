@@ -4,6 +4,17 @@ import traceback
 
 from radial.i18n import t
 
+# Funciones a las que se avisa con el botón cada vez que una acción sale bien (p. ej., para el modo reto)
+oyentes = []
+
+
+def _avisar(boton):
+    for oyente in list(oyentes):
+        try:
+            oyente(boton)
+        except Exception:  # quien escucha nunca debe romper la acción
+            traceback.print_exc()
+
 
 def comando_existe(nombre):
     """True si ``nombre`` es un comando de Maya (runTimeCommand o procedimiento MEL)."""
@@ -66,6 +77,7 @@ def ejecutar(boton, opciones=False):
                 cmds.warning(t("accion_no_existe", nombre=nombre, comando=accion))
                 return False
             mel.eval(accion)
+            _avisar(boton)
         else:
             # Las líneas propias se deshacen de una vez con Ctrl+Z.
             cmds.undoInfo(openChunk=True, chunkName="Radial: " + nombre)

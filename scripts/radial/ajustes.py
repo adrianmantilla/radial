@@ -24,11 +24,33 @@ REGLAS_POR_DEFECTO = {
 _ARCHIVO = "ajustes.json"
 
 
+def _fijable(leer):
+    """Para una opción que el profesor puede fijar: si está en ``fijadas``, manda ese valor."""
+    clave = leer.__name__
+
+    def leer_o_fijada(self):
+        fijadas = getattr(self, "fijadas", None) or {}
+        return fijadas[clave] if clave in fijadas else leer(self)
+
+    leer_o_fijada.__name__ = clave
+    leer_o_fijada.__doc__ = leer.__doc__
+    return leer_o_fijada
+
+
 class Ajustes(object):
     def __init__(self, carpeta_preferencias):
         self.carpeta = carpeta_preferencias
         self.ruta = os.path.join(carpeta_preferencias, _ARCHIVO)
         self.datos = self._leer()
+        # Opciones que fija el profesor desde la carpeta de clase (no se guardan: mandan mientras estén)
+        self.fijadas = {}
+
+    def fijar_opciones(self, opciones):
+        """Pone las opciones que fija el profesor. Las del alumno no se tocan y vuelven al quitarlas."""
+        prueba = Ajustes.__new__(Ajustes)
+        prueba.datos, prueba.fijadas = dict(opciones or {}), {}
+        self.fijadas = {clave: getattr(prueba, clave) for clave in (opciones or {})
+                        if isinstance(getattr(Ajustes, clave, None), property)}
 
     def _leer(self):
         try:
@@ -47,6 +69,7 @@ class Ajustes(object):
 
     # Velocidad del doble Tab
     @property
+    @_fijable
     def ventana_ms(self):
         return detector_tab.limitar_ventana(self.datos.get("ventana_ms"))
 
@@ -82,6 +105,7 @@ class Ajustes(object):
 
     # Forma del menú: «radial» (anillo de puntos) o «pill» (cápsula)
     @property
+    @_fijable
     def forma(self):
         valor = self.datos.get("forma")
         return valor if valor in FORMAS else FORMAS[0]
@@ -91,6 +115,7 @@ class Ajustes(object):
         self.datos["forma"] = valor if valor in FORMAS else FORMAS[0]
 
     @property
+    @_fijable
     def pill_vertical(self):
         return self.datos.get("pill_vertical") is True
 
@@ -123,6 +148,7 @@ class Ajustes(object):
 
     # Buscador de acciones bajo el menú
     @property
+    @_fijable
     def buscador(self):
         return self.datos.get("buscador") is not False
 
@@ -142,6 +168,19 @@ class Ajustes(object):
     def recientes(self, valor):
         self.datos["recientes"] = list(valor)
 
+    @property
+    def favoritos(self):
+        """Acciones del buscador marcadas con estrella (mismo formato que ``recientes``)."""
+        valor = self.datos.get("favoritos")
+        if not isinstance(valor, list):
+            return []
+        return [a for a in valor if isinstance(a, dict) and isinstance(a.get("boton"), dict)
+                and isinstance(a.get("texto"), str)]
+
+    @favoritos.setter
+    def favoritos(self, valor):
+        self.datos["favoritos"] = list(valor)
+
     # Carpeta de clase: radiales que comparte el profesor (también con RADIAL_CLASE)
     @property
     def carpeta_clase(self):
@@ -159,6 +198,7 @@ class Ajustes(object):
 
     # Opciones que se activan en Ajustes
     @property
+    @_fijable
     def carpetas(self):
         return self.datos.get("carpetas") is True
 
@@ -167,6 +207,7 @@ class Ajustes(object):
         self.datos["carpetas"] = bool(valor)
 
     @property
+    @_fijable
     def automatico(self):
         return self.datos.get("automatico") is True
 
@@ -186,7 +227,69 @@ class Ajustes(object):
     def reglas(self, valor):
         self.datos["reglas"] = dict(valor)
 
+    # Aspecto: tema, color de acento e idioma de la interfaz
     @property
+    def tema(self):
+        from radial import tema
+        return tema.normalizar_tema(self.datos.get("tema"))
+
+    @tema.setter
+    def tema(self, valor):
+        from radial import tema
+        self.datos["tema"] = tema.normalizar_tema(valor)
+
+    @property
+    def acento(self):
+        from radial import tema
+        return tema.normalizar_acento(self.datos.get("acento"))
+
+    @acento.setter
+    def acento(self, valor):
+        from radial import tema
+        self.datos["acento"] = tema.normalizar_acento(valor)
+
+    @property
+    def iconos(self):
+        """Iconos automáticos de los botones: «propios» (los del plugin, por defecto) o «maya»."""
+        from radial import iconos
+        valor = self.datos.get("iconos")
+        return valor if valor in iconos.MODOS else iconos.MODOS[0]
+
+    @iconos.setter
+    def iconos(self, valor):
+        from radial import iconos
+        self.datos["iconos"] = valor if valor in iconos.MODOS else iconos.MODOS[0]
+
+    @property
+    def idioma(self):
+        """«es», «en»... o "" si no se ha elegido (entonces manda RADIAL_IDIOMA o el español)."""
+        valor = self.datos.get("idioma")
+        return valor if isinstance(valor, str) and valor.isalpha() and len(valor) <= 5 else ""
+
+    @idioma.setter
+    def idioma(self, valor):
+        self.datos["idioma"] = valor or ""
+
+    @property
+    def usos(self):
+        """Veces que se ha lanzado cada comando de Maya desde Radial: ``{comando: veces}``."""
+        valor = self.datos.get("usos")
+        if not isinstance(valor, dict):
+            valor = self.datos["usos"] = {}
+        return valor
+
+    @property
+    def atajo(self):
+        """Atajo de teclado opcional para el menú («Ctrl+Alt+R»), o ""."""
+        valor = self.datos.get("atajo")
+        return valor if isinstance(valor, str) else ""
+
+    @atajo.setter
+    def atajo(self, valor):
+        self.datos["atajo"] = valor or ""
+
+    @property
+    @_fijable
     def aprendizaje(self):
         return self.datos.get("aprendizaje") is not False
 

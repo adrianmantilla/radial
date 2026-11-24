@@ -8,12 +8,13 @@
 """
 
 from radial import radiales as rd
-from radial.arrastre import SoltarBoton
-from radial.dibujo import COLOR_ABIERTO, COLOR_FONDO
-from radial.qt import QtCore, QtGui, QtWidgets
+from radial.arrastre import SoltarBoton, datos_mime
+from radial.dibujo import COLOR_ABIERTO, COLOR_FONDO, COLOR_ICONO_CLARO, pixmap_icono
+from radial.qt import QtCore, QtGui, QtWidgets, posicion_local
 
 Qt = QtCore.Qt
 
+DISTANCIA_GESTO = 30
 COLOR_ENCENDIDO = QtGui.QColor(127, 209, 166)
 
 
@@ -24,9 +25,67 @@ class MenuComun(SoltarBoton):
     al_carpeta = None  # funcion(carpeta) al abrir o cerrar una carpeta
     al_sobre = None    # funcion(boton o None) al pasar el ratón por un botón (modo aprendizaje)
 
+    def num(self):
+        """Cuántos botones tiene el menú (seis salvo que el radial diga otra cosa)."""
+        radial = getattr(self, "radial", None)
+        return len(radial["botones"]) if radial else rd.NUM_BOTONES
+
+    def _ajustar_a_cantidad(self):
+        """Tras cambiar de radial: deja animaciones, estados, carpeta y ratón dentro de los botones que hay."""
+        self._apertura = [0.0] * self.num()
+        self.fijar_estados(self.estados)
+        if self.carpeta is not None and (self.carpeta >= self.num()
+                                         or self.radial["botones"][self.carpeta]["tipo"] != "carpeta"):
+            self.carpeta = None
+        if isinstance(getattr(self, "_sobre", None), int) and self._sobre >= self.num():
+            self._sobre = None
+
+    # --- Arrastrar un botón a otro menú ---------------------------------------------
+
+    def _arrastrar_boton(self, evento):
+        """Pulsar un botón y arrastrar: lleva una copia a otro botón (de este menú o de la pill extra)."""
+        indice = getattr(self, "_pulsado", None)
+        inicio = getattr(self, "_inicio_pulsado", None)
+        if (not isinstance(indice, int) or inicio is None or not evento.buttons() & Qt.LeftButton
+                or (posicion_local(evento) - inicio).manhattanLength() < QtWidgets.QApplication.startDragDistance()):
+            return False
+        boton = self.botones_visibles()[indice]
+        self._pulsado = None
+        if boton["tipo"] == "vacio":
+            return False
+        import copy
+        arrastre = QtGui.QDrag(self)
+        arrastre.setMimeData(datos_mime(copy.deepcopy(boton)))
+        mapa = pixmap_icono(boton.get("icono", ""), 22, self.devicePixelRatioF(), COLOR_ICONO_CLARO)
+        if mapa is not None:
+            arrastre.setPixmap(mapa)
+        arrastre.exec(Qt.CopyAction)
+        return True
+
+    # --- Gesto (Tab, Tab mantenido y soltar) ------------------------------------
+
+    def boton_en_gesto(self, inicio, ahora):
+        """El botón al que apunta el gesto que empezó en ``inicio`` (puntos de pantalla), o None.
+
+        Primero cuenta el botón que está bajo el ratón; si no, en el radial, el que está en
+        la dirección en la que se ha movido el ratón (al menos ``DISTANCIA_GESTO`` píxeles).
+        """
+        sobre = self._que_hay(self.mapFromGlobal(ahora))
+        if isinstance(sobre, int):
+            return sobre
+        return self._direccion(ahora.x() - inicio.x(), ahora.y() - inicio.y())
+
+    def _direccion(self, dx, dy):
+        return None  # la pill no tiene direcciones: solo cuenta el botón bajo el ratón
+
+    def marcar_gesto(self, indice):
+        """Resalta el botón al que apunta el gesto (o ninguno)."""
+        if indice != self._sobre:
+            self._fijar_sobre(indice)
+
     def _iniciar_comun(self):
         self.carpeta = None
-        self.estados = [None] * rd.NUM_BOTONES
+        self.estados = [None] * self.num()
         self._mayus = False
         self._reloj_mayus = QtCore.QTimer(self)
         self._reloj_mayus.setInterval(120)
@@ -53,7 +112,9 @@ class MenuComun(SoltarBoton):
         if self.carpeta is not None:
             boton = self.radial["botones"][self.carpeta]
             if boton["tipo"] == "carpeta":
-                return boton["botones"]
+                # La carpeta tiene seis; se enseñan tantos como huecos tenga el menú.
+                dentro = boton["botones"][:self.num()]
+                return dentro + [rd.boton_vacio() for _ in range(self.num() - len(dentro))]
             self.carpeta = None
         return self.radial["botones"]
 
@@ -71,16 +132,16 @@ class MenuComun(SoltarBoton):
         self._cambio_de_pagina()
 
     def _cambio_de_pagina(self):
-        self.estados = [None] * rd.NUM_BOTONES
+        self.estados = [None] * self.num()
         self._sobre = None
-        self._apertura = [0.0] * rd.NUM_BOTONES
+        self._apertura = [0.0] * self.num()
         if self.al_carpeta is not None:
             self.al_carpeta(self.carpeta)
         self.update()
 
     def fijar_estados(self, estados):
-        estados = list(estados or [])[:rd.NUM_BOTONES]
-        self.estados = estados + [None] * (rd.NUM_BOTONES - len(estados))
+        estados = list(estados or [])[:self.num()]
+        self.estados = estados + [None] * (self.num() - len(estados))
         self.update()
 
     # --- Clic en un botón -------------------------------------------------------

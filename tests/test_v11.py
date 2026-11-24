@@ -9,7 +9,7 @@ RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(RAIZ, "scripts"))
 
 from radial import ajustes as aj  # noqa: E402
-from radial import automatico, interruptores  # noqa: E402
+from radial import automatico, grabar, interruptores, paquete, reto  # noqa: E402
 from radial import radiales as rd  # noqa: E402
 from radial.biblioteca import CLASE, MIO, Biblioteca  # noqa: E402
 from radial.i18n import sinonimos  # noqa: E402
@@ -156,6 +156,159 @@ class PruebaAjustesExtra(unittest.TestCase):
             self.assertEqual((nueva.activa, nueva.vertical, nueva.posicion), (True, True, (10, 20)))
             self.assertEqual(Biblioteca(nueva, os.path.join(tmp, "radiales")).activo["botones"][0]["texto"],
                              "Solo en la extra")
+
+
+class PruebaCantidad(unittest.TestCase):
+    def test_por_defecto_seis_y_limites(self):
+        self.assertEqual(len(rd.por_defecto()["botones"]), 6)
+        self.assertNotIn("cantidad", rd.por_defecto())
+        for pedida, esperada in ((9, 9), (1, rd.MIN_BOTONES), (40, rd.MAX_BOTONES), ("x", 6), (True, 6)):
+            radial = rd.normalizar({"botones": [], "cantidad": pedida})
+            self.assertEqual(len(radial["botones"]), esperada, pedida)
+
+    def test_cambiar_cantidad_conserva_lo_que_cabe(self):
+        radial = rd.cambiar_cantidad(rd.por_defecto(), 8)
+        self.assertEqual(len(radial["botones"]), 8)
+        self.assertEqual(radial["botones"][0], rd.por_defecto()["botones"][0])
+        self.assertEqual(radial["botones"][7]["tipo"], "vacio")
+        menos = rd.cambiar_cantidad(radial, 3)
+        self.assertEqual(len(menos["botones"]), 3)
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertEqual(len(rd.leer(rd.escribir(radial, os.path.join(tmp, "a.radial")))["botones"]), 8)
+
+    def test_geometria_de_la_pill(self):
+        ap = rd.normalizar_apariencia({})
+        ancho6 = rd.geometria_pill(ap)[0]
+        ancho9, _, _, botones = rd.geometria_pill(ap, n=9)
+        self.assertEqual(len(botones), 9)
+        self.assertGreater(ancho9, ancho6)
+        x, y, w, h = botones[8]
+        self.assertEqual(rd.que_hay_en_pill(x + w / 2, y + h / 2, ap, n=9), 8)
+        self.assertEqual(len(rd.posiciones(80, 9)), 9)
+
+
+class PruebaAtajo(unittest.TestCase):
+    def test_partes(self):
+        from radial import atajo
+        windows = atajo.partes("Ctrl+Alt+R", mac=False)
+        self.assertEqual(windows, {"keyShortcut": "r", "ctrlModifier": True, "altModifier": True,
+                                   "commandModifier": False})
+        mac = atajo.partes("Ctrl+Shift+R", mac=True)
+        self.assertEqual((mac["keyShortcut"], mac["commandModifier"], mac["ctrlModifier"]), ("R", True, False))
+        self.assertTrue(atajo.partes("Meta+F5", mac=True)["ctrlModifier"])
+        self.assertEqual(atajo.partes("Alt+Space", mac=False)["keyShortcut"], "Space")
+        for malo in ("R", "Shift+R", "", "Ctrl+", "Hyper+R", "Ctrl+Raro"):
+            with self.assertRaises(atajo.AtajoNoValido):
+                atajo.partes(malo, mac=False)
+
+
+class PruebaGrabar(unittest.TestCase):
+    REGISTRO = """// Result: pCube1
+select -r pCube1 ;
+polyExtrudeFacet -constructionHistory 1 -keepFacesTogether 1 pCube1.f[1];
+// Result: polyExtrudeFace1 //
+setAttr "polyExtrudeFace1.localTranslate" -type double3 0 0 0.5 ;
+setAttr "polyExtrudeFace1.localTranslate" -type double3 0 0 0.5 ;
+setToolTo moveSuperContext;
+# Warning: algo #
+polyBevel3 -fraction 0.2 pCube1.e[4];
+sin punto y coma
+"""
+
+    def test_solo_ordenes_utiles(self):
+        self.assertEqual(grabar.ordenes(self.REGISTRO), [
+            "polyExtrudeFacet -constructionHistory 1 -keepFacesTogether 1 pCube1.f[1];",
+            'setAttr "polyExtrudeFace1.localTranslate" -type double3 0 0 0.5 ;',
+            "polyBevel3 -fraction 0.2 pCube1.e[4];"])
+        self.assertEqual(len(grabar.ordenes(self.REGISTRO, limite=1)), 1)
+        self.assertEqual(grabar.ordenes(None), [])
+
+    def test_boton(self):
+        boton = grabar.boton(["polyBevel3 -fraction 0.2;", "  "])
+        self.assertEqual(boton["tipo"], "mel")
+        self.assertEqual(boton["texto"], "polyBevel3")
+        self.assertEqual(boton["accion"], "polyBevel3 -fraction 0.2;")
+        self.assertEqual(grabar.boton(["a;", "b;"], "Mío")["accion"], "a;\nb;")
+        self.assertIsNone(grabar.boton([]))
+        rd.normalizar_boton(boton)  # es un botón válido
+
+
+class PruebaPaquete(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.ajustes = aj.Ajustes(os.path.join(self.tmp.name, "prefs"))
+
+    def test_ida_y_vuelta(self):
+        self.ajustes.forma = "pill"
+        self.ajustes.carpetas = True
+        datos = paquete.crear("Modelado 1º", rd.por_defecto(), self.ajustes, extra=rd.cambiar_cantidad(
+            rd.por_defecto(), 4), extra_activa=True, fijar=True)
+        ruta = paquete.escribir(datos, os.path.join(self.tmp.name, "clase", "modelado"))
+        self.assertTrue(ruta.endswith(".radialclase"))
+        leido = paquete.leer(ruta)
+        self.assertEqual(leido["nombre"], "Modelado 1º")
+        self.assertEqual(len(leido["extra"]["botones"]), 4)
+        self.assertTrue(leido["extra_activa"])
+        self.assertEqual(leido["opciones"]["forma"], "pill")
+        self.assertEqual(set(leido["fijas"]), set(paquete.OPCIONES))
+
+    def test_no_valido(self):
+        ruta = os.path.join(self.tmp.name, "x.radialclase")
+        for contenido in ("no es json", "{}", '{"paquete_radial": 99, "menu": {}}', '{"paquete_radial": 1}'):
+            with open(ruta, "w") as f:
+                f.write(contenido)
+            with self.assertRaises(paquete.PaqueteNoValido):
+                paquete.leer(ruta)
+
+    def test_opciones_fijadas_en_la_carpeta_de_clase(self):
+        clase = os.path.join(self.tmp.name, "clase")
+        self.ajustes.forma = "radial"
+        self.ajustes.aprendizaje = False
+        profesor = aj.Ajustes(os.path.join(self.tmp.name, "profesor"))
+        profesor.forma = "pill"
+        paquete.escribir(paquete.crear("A", rd.por_defecto(), profesor, fijar=True), os.path.join(clase, "a"))
+        paquete.escribir(paquete.crear("B", rd.por_defecto(), self.ajustes), os.path.join(clase, "b"))
+        fijadas = paquete.fijadas_de_carpeta(clase)
+        self.assertEqual(fijadas["forma"], "pill")
+        self.assertTrue(fijadas["aprendizaje"])
+        self.ajustes.fijar_opciones(fijadas)
+        self.assertEqual(self.ajustes.forma, "pill")
+        self.assertTrue(self.ajustes.aprendizaje)
+        self.ajustes.forma = "radial"  # el alumno no puede cambiarla mientras esté fijada
+        self.assertEqual(self.ajustes.forma, "pill")
+        self.ajustes.fijar_opciones({})  # sin carpeta de clase, vuelven las suyas
+        self.assertEqual(self.ajustes.forma, "radial")
+        self.assertFalse(self.ajustes.aprendizaje)
+        self.assertEqual(paquete.fijadas_de_carpeta(os.path.join(self.tmp.name, "no_existe")), {})
+
+
+class PruebaReto(unittest.TestCase):
+    def test_de_qt(self):
+        self.assertEqual(reto.de_qt("Ctrl+Shift+E", mac=False), "Ctrl+Mayús+E")
+        self.assertEqual(reto.de_qt("Ctrl+E", mac=True), "Cmd+E")
+        self.assertEqual(reto.de_qt("Meta+Alt+E", mac=True), "Ctrl+Alt+E")
+        self.assertEqual(reto.de_qt("W", mac=False), "W")
+        self.assertEqual(reto.de_qt("", mac=False), "")
+
+    def test_iguales(self):
+        self.assertTrue(reto.iguales("Ctrl+Alt+E", "Alt+Ctrl+e"))
+        self.assertFalse(reto.iguales("Ctrl+E", "Ctrl+Mayús+E"))
+        self.assertFalse(reto.iguales("", ""))
+
+    def test_preguntas(self):
+        import random
+        usos = {}
+        for _ in range(5):
+            reto.registrar_uso(usos, "PolyExtrude")
+        reto.registrar_uso(usos, "SinAtajo")
+        self.assertEqual(usos["PolyExtrude"], 5)
+        atajos = {"PolyExtrude": "Ctrl+E", "Duplicate": "Ctrl+D", "CenterPivot": "", "Undo": "Z"}
+        lista = reto.preguntas(usos, atajos, cantidad=2, azar=random.Random(1))
+        self.assertEqual(len(lista), 2)
+        self.assertIn(("PolyExtrude", "Ctrl+E"), lista)  # lo más usado entra siempre
+        self.assertNotIn("SinAtajo", [c for c, _ in lista])
+        self.assertEqual(reto.preguntas({}, {}), [])
 
 
 class PruebaGlosario(unittest.TestCase):

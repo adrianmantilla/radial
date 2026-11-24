@@ -158,6 +158,8 @@ def _al_soltar(indice, boton):
     menu = pill(crear=False)
     carpeta = menu.carpeta if menu else None
     if carpeta is not None and radial["botones"][carpeta]["tipo"] == "carpeta":
+        if indice >= len(radial["botones"][carpeta]["botones"]):
+            return  # hueco de relleno: las carpetas tienen seis botones
         radial["botones"][carpeta]["botones"][indice] = rd.normalizar_boton(boton, carpeta_permitida=False)
         nuevo = radial["botones"][carpeta]["botones"][indice]
     else:
@@ -210,6 +212,11 @@ def cambiar_apariencia(apariencia):
     radial = dict(biblioteca().activo)
     radial["apariencia"] = rd.normalizar_apariencia(apariencia)
     modificar(radial)
+
+
+def cambiar_cantidad(cantidad):
+    """Cuántos botones tiene la pill extra (de 2 a 12). Los que sobran se quitan; los nuevos, vacíos."""
+    modificar(rd.cambiar_cantidad(biblioteca().activo, cantidad))
 
 
 def guardar():

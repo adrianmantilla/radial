@@ -21,7 +21,9 @@ COMANDO_CONFIGURAR = "RadialConfigurar"
 
 _estado = {"menu": None, "filtro": None, "ajustes": None, "biblioteca": None,
            "configurador": None, "ventana_ajustes": None, "gestor": None, "buscador": None,
-           "tarjeta": None, "reloj_automatico": None, "contexto": None, "fuentes": None}
+           "tarjeta": None, "reloj_automatico": None, "contexto": None, "fuentes": None, "atajos": None,
+           "reto": None,
+           "reloj_gesto": None, "gesto": None}
 
 
 # --- Ajustes y biblioteca -------------------------------------------------------
@@ -78,7 +80,7 @@ def _radial_cambiado():
     ventana_ajustes = _ventana("ventana_ajustes")
     if ventana_ajustes:
         ventana_ajustes.fijar(bib.activo["apariencia"], ajustes().forma, ajustes().pill_vertical,
-                              ajustes().ventana_ms)
+                              ajustes().ventana_ms, len(bib.activo["botones"]))
     gestor = _ventana("gestor")
     if gestor:
         gestor.refrescar()
@@ -206,6 +208,172 @@ def exportar_bloqueado():
         cmds.warning(t("gestor_error", error=error))
         return
     print(t("exportado_bloqueado", ruta=ruta))
+
+
+# --- Aspecto: tema, acento e idioma -------------------------------------------------
+
+def _rehacer_flotantes():
+    """Vuelve a crear el menú, el buscador, la tarjeta y la pill extra (tras cambiar tema o idioma)."""
+    from radial import pill_extra
+    estaba_visible = visible()
+    _destruir_menu_flotante()
+    _destruir_buscador()
+    tarjeta = _estado.get("tarjeta")
+    if sigue_vivo(tarjeta):
+        tarjeta.hide()
+        destruir(tarjeta)
+    _estado["tarjeta"] = None
+    extra_activa = pill_extra.visible()
+    pill_extra.detener()
+    if extra_activa:
+        pill_extra.iniciar()
+    if estaba_visible:
+        mostrar()
+
+
+def cambiar_aspecto(tema_nuevo=None, acento=None):
+    """Tema («oscuro» o «claro») y color de acento («#rrggbb» o "" para el del tema)."""
+    from radial import tema
+    if tema_nuevo is not None:
+        ajustes().tema = tema_nuevo
+    if acento is not None:
+        ajustes().acento = acento
+    ajustes().guardar()
+    if tema.aplicar(ajustes().tema, ajustes().acento):
+        _rehacer_flotantes()
+
+
+def cambiar_iconos(modo):
+    """Iconos automáticos: «propios» (los del plugin) o «maya» (los de Maya a color)."""
+    from radial import iconos
+    ajustes().iconos = modo
+    ajustes().guardar()
+    if iconos.modo() != ajustes().iconos:
+        iconos.usar_iconos(ajustes().iconos, _icono_de_comando)
+        _rehacer_flotantes()
+        configurador = _ventana("configurador")
+        if configurador:
+            configurador.fijar_radial(biblioteca().activo, biblioteca().sin_guardar, _nombre_activo())
+
+
+def cambiar_idioma(idioma):
+    """Idioma de la interfaz («es», «en»...). Rehace el menú de Maya y las ventanas."""
+    from radial import i18n
+    ajustes().idioma = idioma
+    ajustes().guardar()
+    if i18n.idioma() == (idioma or i18n.IDIOMA_BASE):
+        return
+    i18n.usar_idioma(idioma)
+    crear_menu()
+    _rehacer_flotantes()
+    ventana = _ventana("ventana_ajustes")
+    if ventana:
+        indice = ventana.pestanas.currentIndex()
+
+        def reabrir():
+            if _ventana("ventana_ajustes"):
+                _estado["ventana_ajustes"].close()
+                destruir(_estado["ventana_ajustes"])
+            _estado["ventana_ajustes"] = None
+            nueva = abrir_ajustes()
+            nueva.pestanas.setCurrentIndex(indice)
+
+        QtCore.QTimer.singleShot(0, reabrir)  # no se destruye una ventana desde su propia señal
+
+
+# --- Paquete de clase -----------------------------------------------------------
+
+def cargar_fijadas():
+    """Lee las opciones que fija el profesor en la carpeta de clase. Devuelve True si cambió algo."""
+    from radial import paquete
+    antes = dict(ajustes().fijadas)
+    ajustes().fijar_opciones(paquete.fijadas_de_carpeta(ajustes().carpeta_clase))
+    return ajustes().fijadas != antes
+
+
+def _aplicar_opciones_vigentes(forma_antes):
+    """Tras cambiar las opciones (paquete o carpeta de clase), pone al día lo que se ve."""
+    filtro = _estado["filtro"]
+    if filtro is not None:
+        filtro.detector.ventana_ms = ajustes().ventana_ms
+    if (ajustes().forma, ajustes().pill_vertical) != forma_antes:
+        estaba_visible = visible()
+        _destruir_menu_flotante()
+        if estaba_visible:
+            mostrar()
+    buscador = _estado.get("buscador")
+    if sigue_vivo(buscador):
+        buscador.activo = ajustes().buscador
+        buscador.actualizar()
+    from radial import pill_extra
+    pill_extra.fijar_carpetas(ajustes().carpetas)
+    if not ajustes().aprendizaje:
+        _ocultar_tarjeta()
+    _estado["contexto"] = None
+    _reloj_automatico()
+
+
+def exportar_paquete():
+    """El profesor exporta su menú, su pill extra y sus opciones en un archivo para la clase."""
+    from radial import paquete, pill_extra
+    fijar, no_fijar, cancelar = t("boton_fijar"), t("boton_no_fijar"), t("boton_cancelar")
+    respuesta = cmds.confirmDialog(title=t("menu_exportar_paquete"), message=t("paquete_fijar_pregunta"),
+                                   button=[fijar, no_fijar, cancelar], defaultButton=no_fijar,
+                                   cancelButton=cancelar, dismissString=cancelar)
+    if respuesta not in (fijar, no_fijar):
+        return None
+    inicio = os.path.join(ajustes().carpeta_clase or "", rd.nombre_de_archivo(_nombre_activo()) + paquete.EXTENSION)
+    rutas = cmds.fileDialog2(fileFilter=t("filtro_paquete"), fileMode=0, caption=t("menu_exportar_paquete"),
+                             okCaption=t("boton_exportar"), startingDirectory=inicio)
+    if not rutas:
+        return None
+    extra_activa = pill_extra.ajustes().activa
+    datos = paquete.crear(_nombre_activo(), radial_activo(), ajustes(),
+                          extra=pill_extra.biblioteca().activo if extra_activa else None,
+                          extra_activa=extra_activa, fijar=respuesta == fijar)
+    try:
+        ruta = paquete.escribir(datos, rutas[0])
+    except (paquete.PaqueteNoValido, OSError) as error:
+        cmds.warning(t("gestor_error", error=error))
+        return None
+    print(t("paquete_exportado", ruta=ruta))
+    return ruta
+
+
+def importar_paquete(ruta=None):
+    """El alumno importa un paquete: los radiales pasan a ser suyos y se aplican las opciones."""
+    from radial import paquete, pill_extra
+    if ruta is None:
+        rutas = cmds.fileDialog2(fileFilter=t("filtro_paquete"), fileMode=1, caption=t("menu_importar_paquete"),
+                                 okCaption=t("boton_importar"))
+        if not rutas:
+            return False
+        ruta = rutas[0]
+    try:
+        datos = paquete.leer(ruta)
+    except paquete.PaqueteNoValido as error:
+        cmds.warning(t("radial_no_valido", ruta=ruta, error=error))
+        return False
+    if not _descartar_cambios_si_hace_falta():
+        return False
+    forma_antes = (ajustes().forma, ajustes().pill_vertical)
+    for clave, valor in datos["opciones"].items():
+        setattr(ajustes(), clave, valor)
+    identificador, _, _ = rd.guardar_nuevo(datos["menu"], carpeta_mios(), datos["menu"]["nombre"])
+    biblioteca().usar("mio:" + identificador)
+    if datos["extra"] is not None:
+        extra = pill_extra.biblioteca()
+        if extra.sin_guardar:
+            extra.restaurar()
+        otro, _, _ = rd.guardar_nuevo(datos["extra"], carpeta_mios(), datos["extra"]["nombre"])
+        extra.usar("mio:" + otro)
+        pill_extra.refrescar()
+        pill_extra.activar(datos["extra_activa"])
+    ajustes().guardar()
+    _radial_cambiado()
+    _aplicar_opciones_vigentes(forma_antes)
+    print(t("paquete_importado", nombre=datos["nombre"]))
+    return True
 
 
 # --- Menú flotante ------------------------------------------------------------
@@ -363,6 +531,8 @@ def _al_soltar(indice, boton):
     menu = _menu_flotante(crear=False)
     carpeta = menu.carpeta if menu else None
     if carpeta is not None and radial["botones"][carpeta]["tipo"] == "carpeta":
+        if indice >= len(radial["botones"][carpeta]["botones"]):
+            return  # hueco de relleno: las carpetas tienen seis botones
         radial["botones"][carpeta]["botones"][indice] = rd.normalizar_boton(boton, carpeta_permitida=False)
         nuevo = radial["botones"][carpeta]["botones"][indice]
     else:
@@ -379,7 +549,8 @@ def _buscador():
     if not sigue_vivo(buscador):
         from radial.buscador import Buscador
         buscador = Buscador(_acciones_buscador, _al_buscar, recientes=lambda: ajustes().recientes,
-                            al_terminar=_devolver_foco, padre=ventana_maya(), buscar_icono=_icono_de_comando)
+                            al_terminar=_devolver_foco, padre=ventana_maya(), buscar_icono=_icono_de_comando,
+                            favoritos=lambda: ajustes().favoritos, al_favorito=_alternar_favorito)
         _estado["buscador"] = buscador
     return buscador
 
@@ -410,6 +581,14 @@ def _acciones_buscador():
                                                    extra.get("ayuda", ""), atajos.get(nombre, "")))
     for estante, botones in fuentes.estantes():
         acciones.extend(busqueda.accion_de_estante(estante, b) for b in botones)
+    try:
+        busqueda.unir_menus(acciones, fuentes.menus())
+    except Exception:  # sin los menús de Maya el buscador sigue funcionando
+        pass
+    try:
+        acciones.extend(busqueda.accion_de_script(ruta, t("buscador_mis_scripts")) for ruta in fuentes.scripts())
+    except Exception:
+        pass
     return acciones
 
 
@@ -419,6 +598,12 @@ def _al_buscar(accion, opciones=False):
     ajustes().guardar()
     acciones.ejecutar(accion["boton"], opciones=opciones)
     _actualizar_estados()
+
+
+def _alternar_favorito(accion):
+    from radial import busqueda
+    ajustes().favoritos = busqueda.alternar_favorito(ajustes().favoritos, accion)
+    ajustes().guardar()
 
 
 def _devolver_foco():
@@ -486,7 +671,7 @@ def abrir_ajustes():
     ventana = _ventana("ventana_ajustes")
     if ventana:
         ventana.fijar(radial_activo()["apariencia"], ajustes().forma, ajustes().pill_vertical,
-                      ajustes().ventana_ms)
+                      ajustes().ventana_ms, len(radial_activo()["botones"]))
         if not visible():
             mostrar()
         return _traer(ventana)
@@ -496,22 +681,114 @@ def abrir_ajustes():
                              al_forma=cambiar_forma, al_velocidad=_velocidad_cambiada, padre=ventana_maya(),
                              buscador=ajustes().buscador, al_buscador=cambiar_buscador,
                              opciones=_opciones(), al_opcion=cambiar_opcion, al_reglas=abrir_reglas,
-                             extra=_datos_extra(), al_extra=cambiar_extra)
+                             extra=_datos_extra(), al_extra=cambiar_extra,
+                             cantidad=len(radial_activo()["botones"]), al_cantidad=cambiar_cantidad,
+                             atajo=ajustes().atajo, al_atajo=cambiar_atajo,
+                             aspecto=_datos_aspecto(), al_aspecto=_al_aspecto)
+    ventana.fijar_bloqueadas(dict(ajustes().fijadas))
     _estado["ventana_ajustes"] = ventana
     if not visible():
         mostrar()
     return _traer(ventana)
 
 
+def _datos_aspecto():
+    from radial import i18n
+    return {"tema": ajustes().tema, "acento": ajustes().acento, "iconos": ajustes().iconos, "idioma": i18n.idioma(),
+            "idiomas": i18n.idiomas()}
+
+
+def _al_aspecto(clave, valor):
+    if clave == "tema":
+        cambiar_aspecto(tema_nuevo=valor)
+    elif clave == "acento":
+        cambiar_aspecto(acento=valor)
+    elif clave == "iconos":
+        cambiar_iconos(valor)
+    elif clave == "idioma":
+        cambiar_idioma(valor)
+
+
+def cambiar_cantidad(cantidad):
+    """Número de botones del menú principal (de 2 a 12)."""
+    if len(radial_activo()["botones"]) != cantidad:
+        modificar_radial(rd.cambiar_cantidad(radial_activo(), cantidad))
+
+
+def cambiar_atajo(texto):
+    """Pone (o quita, con "") el atajo de teclado del menú. Devuelve "" o el motivo por el que no se puede."""
+    from radial import atajo
+    anterior = ajustes().atajo
+    if texto == anterior:
+        return ""
+    if texto:
+        try:
+            atajo.asignar(texto, COMANDO_ALTERNAR, t("comando_anotacion"))
+        except atajo.AtajoNoValido as error:
+            ocupado = str(error)
+            return t("atajo_ocupado", comando=ocupado) if ocupado and ocupado != texto else t("atajo_no_valido")
+        except RuntimeError as error:
+            return str(error)
+    if anterior:
+        atajo.quitar(anterior)
+    ajustes().atajo = texto
+    ajustes().guardar()
+    print(t("atajo_asignado", atajo=texto) if texto else t("atajo_quitado"))
+    return ""
+
+
+def _ejecutar_dialogo(dialogo):
+    """Abre ``dialogo`` y espera (aparte para poder probarlo sin ventana)."""
+    return dialogo.exec_() if hasattr(dialogo, "exec_") else dialogo.exec()
+
+
+def _titulo_hueco(i, boton):
+    return "{} · {}".format(i + 1, boton["texto"] or t("config_hueco_vacio"))
+
+
+def crear_boton_de_lo_ultimo():
+    """Crea un botón con las últimas órdenes del Script Editor, sin escribir código."""
+    from radial import grabar, pill_extra
+    lineas = grabar.ordenes(grabar.registro_maya())
+    if not lineas:
+        cmds.confirmDialog(title=t("grabar_titulo"), message=t("grabar_vacio"), button=[t("boton_aceptar")])
+        return False
+    destinos = [("menu", t("grabar_menu_principal", nombre=_nombre_activo()))]
+    huecos = {"menu": [(i, _titulo_hueco(i, b)) for i, b in enumerate(radial_activo()["botones"])]}
+    if pill_extra.ajustes().activa:
+        destinos.append(("extra", t("grabar_menu_extra", nombre=pill_extra.nombre())))
+        huecos["extra"] = [(i, _titulo_hueco(i, b)) for i, b in enumerate(pill_extra.biblioteca().activo["botones"])]
+    dialogo = grabar.dialogo(lineas, huecos, destinos, padre=ventana_maya())
+    vacios = [i for i, b in enumerate(radial_activo()["botones"]) if b["tipo"] == "vacio"]
+    if vacios:
+        dialogo.hueco.setCurrentIndex(dialogo.hueco.findData(vacios[0]))
+    if not _ejecutar_dialogo(dialogo):
+        return False
+    boton, destino, indice = dialogo.resultado()
+    if boton is None or indice is None:
+        return False
+    extra = destino == "extra"
+    radial = pill_extra.biblioteca().activo if extra else radial_activo()
+    if radial.get("bloqueado"):
+        cmds.warning(t("radial_bloqueado_aviso", nombre=pill_extra.nombre() if extra else _nombre_activo()))
+        return False
+    radial = dict(radial, botones=list(radial["botones"]))
+    radial["botones"][indice] = rd.normalizar_boton(boton)
+    (pill_extra.modificar if extra else modificar_radial)(radial)
+    print(t("buscador_asignado", texto=boton["texto"], numero=indice + 1))
+    return True
+
+
 def _datos_extra():
     from radial import pill_extra
     return {"activa": pill_extra.ajustes().activa, "vertical": pill_extra.ajustes().vertical,
             "radial": pill_extra.biblioteca().origen, "apariencia": pill_extra.biblioteca().activo["apariencia"],
+            "cantidad": len(pill_extra.biblioteca().activo["botones"]),
             "radiales": _todos_los_radiales()}
 
 
 def cambiar_extra(clave, valor=None):
-    """La pill extra desde Ajustes: activa, radial, vertical, apariencia o configurar."""
+    """La pill extra desde Ajustes: activa, radial, vertical, apariencia, cantidad o configurar."""
     from radial import pill_extra
     if clave == "activa":
         pill_extra.activar(valor)
@@ -521,6 +798,8 @@ def cambiar_extra(clave, valor=None):
         pill_extra.cambiar_vertical(valor)
     elif clave == "apariencia":
         pill_extra.cambiar_apariencia(valor)
+    elif clave == "cantidad":
+        pill_extra.cambiar_cantidad(valor)
     elif clave == "configurar":
         pill_extra.abrir_configurador()
     ventana = _ventana("ventana_ajustes")
@@ -555,6 +834,12 @@ def cambiar_opcion(clave, valor):
     elif clave == "carpeta_clase":
         biblioteca()._activo = None  # se vuelve a leer: si era de clase y ya no está, se usa otro
         _radial_cambiado()
+        forma_antes = (ajustes().forma, ajustes().pill_vertical)
+        if cargar_fijadas():
+            _aplicar_opciones_vigentes(forma_antes)
+            ventana = _ventana("ventana_ajustes")
+            if ventana:
+                ventana.fijar_bloqueadas(dict(ajustes().fijadas))
 
 
 def _todos_los_radiales():
@@ -665,12 +950,63 @@ def _al_sobre(boton, menu=None):
     from radial import acciones
     from radial.ayuda import contenido
     try:
-        datos = contenido(boton, _info_de(boton), acciones.estado(boton), _tiene_opciones(boton))
+        icono = _icono_de_comando(boton["accion"]) if boton.get("tipo") == "comando" else ""
+        datos = contenido(boton, _info_de(boton), acciones.estado(boton), _tiene_opciones(boton), icono)
     except Exception:  # la ayuda nunca debe romper el menú
         return
     menu = menu if menu is not None else _menu_flotante(crear=False)
     if menu:
         _tarjeta().mostrar(datos, menu)
+
+
+def _al_usar(boton):
+    """Cuenta los usos de cada comando; a las 3, 10 y 25 veces recuerda su atajo de teclado."""
+    if boton.get("tipo") != "comando":
+        return
+    from radial import reto
+    comando = boton.get("accion", "")
+    veces = reto.registrar_uso(ajustes().usos, comando)
+    ajustes().guardar()
+    if veces not in reto.AVISOS or not ajustes().aprendizaje:
+        return
+    atajo = _atajos().get(comando)
+    if atajo:
+        texto = t("reto_recuerda", nombre=_nombre_comando(comando), atajo=atajo)
+        try:
+            cmds.inViewMessage(assistMessage=texto, position="botCenter", fade=True, fadeStayTime=2500)
+        except Exception:
+            print("Radial: " + texto)
+
+
+def _atajos():
+    if _estado.get("atajos") is None:
+        try:
+            _estado["atajos"] = _fuentes().atajos()
+        except Exception:
+            _estado["atajos"] = {}
+    return _estado["atajos"]
+
+
+def _nombre_comando(comando):
+    """El nombre en el idioma del alumno si lo hay («Extruir»); si no, el de Maya («Poly Extrude»)."""
+    from radial import busqueda
+    traducido = sinonimos().get(comando, {}).get("es", "")
+    return traducido or busqueda.texto_de_comando(comando)
+
+
+def abrir_reto():
+    """Modo reto: pregunta los atajos de los comandos que más usas."""
+    from radial import reto
+    _estado["atajos"] = None  # por si se cambió algún atajo en Maya
+    lista = reto.preguntas(ajustes().usos, _atajos())
+    if not lista:
+        cmds.confirmDialog(title=t("reto_titulo"), message=t("reto_sin_atajos"), button=[t("boton_aceptar")])
+        return None
+    ventana = reto.dialogo(lista, _nombre_comando, padre=ventana_maya())
+    _estado["reto"] = ventana
+    ventana.show()
+    ventana.raise_()
+    return ventana
 
 
 def _apariencia_cambiada(apariencia):
@@ -705,6 +1041,7 @@ def abrir_gestor():
 
 
 def _cerrar_ventanas():
+    _parar_gesto()
     reloj = _estado.get("reloj_automatico")
     if sigue_vivo(reloj):
         reloj.stop()
@@ -714,7 +1051,7 @@ def _cerrar_ventanas():
         tarjeta.hide()
         destruir(tarjeta)
     _estado["tarjeta"] = None
-    for clave in ("configurador", "ventana_ajustes", "gestor"):
+    for clave in ("configurador", "ventana_ajustes", "gestor", "reto"):
         ventana = _ventana(clave)
         if ventana:
             ventana.close()
@@ -744,6 +1081,63 @@ def _puede_contar(es_segundo):
     return visible() or _sobre_visor()
 
 
+# Gesto: Tab, Tab sin soltar el segundo, mover el ratón hacia un botón y soltar.
+
+def _al_doble_tab():
+    alternar()
+    filtro = _estado.get("filtro")
+    if visible() and filtro is not None and filtro.manteniendo:
+        _empezar_gesto()
+
+
+def _empezar_gesto():
+    reloj = _estado.get("reloj_gesto")
+    if not sigue_vivo(reloj):
+        reloj = QtCore.QTimer(ventana_maya())
+        reloj.setInterval(16)
+        reloj.timeout.connect(_seguir_gesto)
+        _estado["reloj_gesto"] = reloj
+    _estado["gesto"] = QtGui.QCursor.pos()
+    reloj.start()
+
+
+def _seguir_gesto():
+    menu = _menu_flotante(crear=False)
+    inicio = _estado.get("gesto")
+    filtro = _estado.get("filtro")
+    if menu is None or inicio is None or not menu.isVisible() or filtro is None or not filtro.manteniendo:
+        _parar_gesto()
+        return
+    menu.marcar_gesto(menu.boton_en_gesto(inicio, QtGui.QCursor.pos()))
+
+
+def _parar_gesto():
+    reloj = _estado.get("reloj_gesto")
+    if sigue_vivo(reloj):
+        reloj.stop()
+
+
+def _al_soltar_tab():
+    """Fin del gesto: si apunta a un botón, se ejecuta y el menú se cierra; si no, se queda abierto."""
+    _parar_gesto()
+    inicio = _estado.pop("gesto", None)
+    menu = _menu_flotante(crear=False)
+    if inicio is None or menu is None or not menu.isVisible():
+        return
+    indice = menu.boton_en_gesto(inicio, QtGui.QCursor.pos())
+    if indice is None:
+        return
+    boton = menu.botones_visibles()[indice]
+    if boton["tipo"] == "carpeta":
+        menu.abrir_carpeta(indice)
+        return
+    if boton["tipo"] == "vacio":
+        return
+    from radial import acciones
+    acciones.ejecutar(boton)
+    ocultar()
+
+
 def _instalar_filtro(intentos=10):
     """Escucha el teclado en las ventanas de Maya (no en toda la aplicación)."""
     if os.environ.get("RADIAL_SIN_TECLADO"):
@@ -756,7 +1150,7 @@ def _instalar_filtro(intentos=10):
             QtCore.QTimer.singleShot(1000, lambda: _instalar_filtro(intentos - 1))
         return
     _quitar_filtro()
-    filtro = FiltroTeclado(_puede_contar, alternar, ajustes().ventana_ms)
+    filtro = FiltroTeclado(_puede_contar, _al_doble_tab, ajustes().ventana_ms, al_soltar_tab=_al_soltar_tab)
     filtro.instalar([ventana])
     # Paneles separados de la ventana principal: se escuchan cuando reciben el foco.
     QtGui.QGuiApplication.instance().focusWindowChanged.connect(filtro.escuchar)
@@ -878,6 +1272,9 @@ def _llenar_radiales(*_):
     cmds.menuItem(label=t("menu_importar"), command=lambda *_: importar())
     cmds.menuItem(label=t("menu_exportar"), command=lambda *_: exportar())
     cmds.menuItem(label=t("menu_exportar_bloqueado"), command=lambda *_: exportar_bloqueado())
+    cmds.menuItem(divider=True)
+    cmds.menuItem(label=t("menu_importar_paquete"), command=lambda *_: importar_paquete())
+    cmds.menuItem(label=t("menu_exportar_paquete"), command=lambda *_: exportar_paquete())
     cmds.menuItem(label=t("menu_gestionar"), command=lambda *_: abrir_gestor())
 
 
@@ -890,6 +1287,7 @@ def _llenar_forma(*_):
                            ("forma_pill_vertical", "pill", True)):
         marcado = forma == f and (v is None or v == vertical)
         cmds.menuItem(label=t(etiqueta), radioButton=marcado,
+                      enable=not ({"forma", "pill_vertical"} & set(ajustes().fijadas)),
                       command=lambda *_, f=f, v=v: cambiar_forma(f, v))
 
 
@@ -898,6 +1296,8 @@ def crear_menu():
     cmds.menu(MENU, parent="MayaWindow", label=t("menu_titulo"), tearOff=True)
     cmds.menuItem(label=t("menu_alternar"), command=lambda *_: alternar())
     cmds.menuItem(label=t("menu_configurar"), command=lambda *_: abrir_configurador())
+    cmds.menuItem(label=t("menu_grabar"), command=lambda *_: crear_boton_de_lo_ultimo())
+    cmds.menuItem(label=t("menu_reto"), command=lambda *_: abrir_reto())
     cmds.menuItem(MENU_RADIALES, label=t("menu_radiales"), subMenu=True, tearOff=True,
                   postMenuCommand=_llenar_radiales)
     cmds.setParent("..", menu=True)
@@ -928,6 +1328,19 @@ def iniciar():
     """Lo llama el plugin al cargarse."""
     if cmds.about(batch=True):
         return
+    try:
+        cargar_fijadas()
+    except Exception as error:  # una carpeta de clase rota no impide que el plugin cargue
+        cmds.warning(str(error))
+    from radial import i18n, tema
+    if ajustes().idioma:
+        i18n.usar_idioma(ajustes().idioma)
+    tema.aplicar(ajustes().tema, ajustes().acento)
+    from radial import iconos
+    iconos.usar_iconos(ajustes().iconos, _icono_de_comando)
+    from radial import acciones
+    if _al_usar not in acciones.oyentes:
+        acciones.oyentes.append(_al_usar)
     crear_menu()
     _crear_comandos()
     # Con Maya ya abierto, no a mitad del arranque.
@@ -946,12 +1359,14 @@ def _iniciar_extra():
 
 def detener():
     """Lo llama el plugin al descargarse: quita el filtro, las ventanas y los menús."""
-    from radial import pill_extra
+    from radial import acciones, pill_extra
+    if _al_usar in acciones.oyentes:
+        acciones.oyentes.remove(_al_usar)
     pill_extra.detener()
     _quitar_filtro()
     _cerrar_ventanas()
     _destruir_menu_flotante()
     _destruir_buscador()
-    _estado.update(ajustes=None, biblioteca=None, fuentes=None)
+    _estado.update(ajustes=None, biblioteca=None, fuentes=None, atajos=None)
     if not cmds.about(batch=True):
         quitar_menu()

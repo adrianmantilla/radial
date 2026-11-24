@@ -2,7 +2,7 @@
 
 Cada idioma es un archivo JSON en esta carpeta (``es.json``, ``en.json``...).
 Si falta una clave en el idioma elegido, se usa el español.
-El idioma se elige con la variable de entorno ``RADIAL_IDIOMA``.
+El idioma se elige en Ajustes › Aspecto (o con la variable de entorno ``RADIAL_IDIOMA``).
 """
 
 import json
@@ -27,7 +27,21 @@ def _cargar(idioma):
 
 def usar_idioma(idioma):
     global _idioma
-    _idioma = idioma
+    _idioma = idioma or os.environ.get("RADIAL_IDIOMA", IDIOMA_BASE)
+
+
+def idioma():
+    return _idioma
+
+
+def idiomas():
+    """Los idiomas que tienen archivo en esta carpeta: lista de (código, nombre en ese idioma)."""
+    resultado = []
+    for archivo in sorted(os.listdir(_CARPETA)):
+        codigo, extension = os.path.splitext(archivo)
+        if extension == ".json" and codigo.isalpha():
+            resultado.append((codigo, _cargar(codigo).get("idioma_nombre", codigo)))
+    return resultado
 
 
 def claves(idioma=IDIOMA_BASE):

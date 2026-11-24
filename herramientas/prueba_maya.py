@@ -1,4 +1,4 @@
-"""Prueba de Radial 1.2 dentro de Maya, sin interfaz (herramienta de desarrollo).
+"""Prueba de Radial 1.3 dentro de Maya, sin interfaz (herramienta de desarrollo).
 
 Desde la terminal, con el mayapy de cada versión:
 
@@ -90,8 +90,12 @@ def main():
     comprobar(len(faltan) <= len(traducidos) // 10,
               "los comandos traducidos existen ({} de {})".format(len(traducidos) - len(faltan), len(traducidos)))
     if faltan:
+        import difflib
         print("        no existen: " + ", ".join(faltan))
-    muestra = ["PolyExtrude", "CenterPivot", "BevelPolygon", "UVEditor", "Hypershade", "CreatePolygonCube",
+        for nombre in faltan:
+            parecidos = difflib.get_close_matches(nombre, sorted(existentes), n=3, cutoff=0.6)
+            print("          {} -> ¿{}?".format(nombre, ", ".join(parecidos) or "nada parecido"))
+    muestra = ["PolyExtrude", "CenterPivot", "BevelPolygon", "TextureViewWindow", "Hypershade", "CreatePolygonCube",
                "FreezeTransformations", "MultiCutTool", "DeleteHistory", "RenderViewWindow"]
     con_icono = {n: fuentes.icono_de_comando(n) for n in muestra}
     comprobar(sum(1 for v in con_icono.values() if v) >= len(muestra) // 2,
@@ -108,7 +112,8 @@ def main():
             comprobar(antes in (True, False), "el interruptor {} se lee".format(clave))
         except Exception as error:  # noqa: BLE001
             comprobar(False, "el interruptor {} se lee ({})".format(clave, error))
-    for clave in ("snap_rejilla", "snap_vertice", "simetria"):
+    sin_interfaz = bool(cmds.about(batch=True))
+    for clave in ("simetria",) if sin_interfaz else ("snap_rejilla", "snap_vertice", "simetria"):
         try:
             antes = interruptores.encendido(clave)
             interruptores.alternar(clave)
@@ -124,6 +129,42 @@ def main():
     except Exception as error:  # noqa: BLE001
         comprobar(False, "el radial automático lee el contexto ({})".format(error))
     print("        workspaces: " + ", ".join(automatico.workspaces_maya()))
+    if sin_interfaz:
+        print("        el imán (rejilla y vértices) solo se puede probar con Maya abierto")
+
+    # 1.3: scripts propios, atajo opcional, modo reto, iconos de Maya y lo último que hice
+    from radial import atajo, busqueda, grabar, iconos as ico, reto
+    try:
+        scripts = fuentes.scripts()
+        comprobar(isinstance(scripts, list), "los scripts propios se leen ({})".format(len(scripts)))
+    except Exception as error:  # noqa: BLE001
+        comprobar(False, "los scripts propios se leen ({})".format(error))
+    try:
+        menus = fuentes.menus()
+        print("        órdenes en los menús de Maya: {} (sin interfaz suele ser 0)".format(len(menus)))
+    except Exception as error:  # noqa: BLE001
+        comprobar(False, "leer los menús de Maya no rompe nada ({})".format(error))
+    try:
+        ocupado = atajo.ocupado_por("Ctrl+Alt+F12")
+        comprobar(isinstance(ocupado, str), "el atajo opcional comprueba si Maya ya lo usa ({})".format(
+            ocupado or "libre"))
+    except Exception as error:  # noqa: BLE001
+        comprobar(False, "el atajo opcional comprueba si Maya ya lo usa ({})".format(error))
+    preguntas = reto.preguntas({"PolyExtrude": 5, "Duplicate": 3}, atajos or {"PolyExtrude": "Ctrl+E"})
+    if not atajos:
+        print("        sin interfaz Maya no carga los atajos: el modo reto se prueba con uno de ejemplo")
+    comprobar(bool(preguntas), "el modo reto encuentra atajos que preguntar ({})".format(
+        ", ".join("{}={}".format(c, a) for c, a in preguntas[:5])))
+    ico.usar_iconos("maya", fuentes.icono_de_comando)
+    con_maya = ico.de_boton({"tipo": "comando", "accion": "PolyExtrude", "icono": ""})
+    ico.usar_iconos("propios")
+    comprobar(con_maya.startswith(":") or con_maya == "extruir",
+              "con «iconos de Maya», un comando usa el de Maya ({})".format(con_maya))
+    texto = "polyCube -w 1 -h 1 -d 1;\nselect -r pCube1 ;\nmove -r 0 1 0 ;\n"
+    boton = grabar.boton(grabar.ordenes(texto))
+    comprobar(boton is not None and acciones.ejecutar(boton), "un botón con lo último que hice se ejecuta")
+    accion_script = busqueda.accion_de_script(os.path.join(RAIZ, "herramientas", "no_existe.py"), "Mis scripts")
+    comprobar(accion_script["boton"]["tipo"] == "python", "los scripts propios se lanzan como Python")
 
     # Biblioteca: guardar, exportar e importar en una carpeta temporal
     import tempfile
@@ -149,6 +190,12 @@ def main():
         b.usar("clase:examen")
         comprobar(b.es_de_clase and b.es_preconfigurado and not b.guardar_cambios(),
                   "un radial de clase bloqueado no se sobrescribe")
+        from radial import paquete
+        ajustes_prueba = aj.Ajustes(os.path.join(tmp, "profesor"))
+        ajustes_prueba.forma = "pill"
+        paquete.escribir(paquete.crear("Clase", b.activo, ajustes_prueba, fijar=True), os.path.join(clase, "clase"))
+        comprobar(paquete.fijadas_de_carpeta(clase).get("forma") == "pill",
+                  "un paquete de clase fija las opciones del profesor")
 
     cmds.unloadPlugin("radial_plugin")
     comprobar(not cmds.pluginInfo("radial_plugin", query=True, loaded=True), "el plugin se descarga")

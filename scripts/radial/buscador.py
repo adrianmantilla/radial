@@ -3,7 +3,8 @@
 Se escribe en ella (tras hacer clic, para no quitarle el teclado a Maya) y sale
 un desplegable con las órdenes de Maya que coinciden. Clic o Intro ejecuta;
 Esc borra y devuelve el teclado a Maya. Un resultado se puede arrastrar hasta
-un botón del menú para asignárselo.
+un botón del menú para asignárselo. La estrella de la derecha lo guarda en
+favoritas, que salen las primeras al abrir el buscador sin escribir nada.
 
 El buscador sigue al menú: se mueve, se muestra y se oculta con él.
 """
@@ -33,6 +34,7 @@ COLOR_TEXTO_ELEGIDO = QtGui.QColor(20, 20, 20)
 COLOR_DETALLE_ELEGIDO = QtGui.QColor(90, 90, 90)
 COLOR_PISTA = QtGui.QColor(150, 154, 160)
 COLOR_CIRCULO = QtGui.QColor(255, 255, 255, 22)
+COLOR_ESTRELLA = QtGui.QColor(242, 192, 55)
 
 
 def _ventana_flotante(widget, acepta_foco):
@@ -62,15 +64,31 @@ class ListaResultados(QtWidgets.QWidget):
         self._pulsada = None
         self._inicio_arrastre = None
         self._iconos = {}
+        # funcion(accion) -> True si tiene estrella; funcion(accion) la pone o la quita (los pone el buscador)
+        self.es_favorita = lambda accion: False
+        self.al_favorito = None
         # funcion(nombre del comando) -> icono de Maya (":/polyBevel.png") o "" (la pone quien crea el buscador)
         self.buscar_icono = None
 
     def fijar(self, acciones, consulta, titulo="", vacio=""):
+        self._todas = list(acciones)
         self.acciones = list(acciones)
         self.consulta = consulta
         self.titulo = titulo
         self.vacio = vacio
         self.elegida = 0
+        self.setFixedHeight(self.alto_necesario())
+        self.update()
+
+    def filas_que_caben(self, alto):
+        """Cuántas filas caben en ``alto`` píxeles."""
+        return max(0, int((alto - 2 * MARGEN - (22 if self.titulo else 0)) // ALTO_FILA))
+
+    def ajustar_filas(self, maximo):
+        """Enseña como mucho ``maximo`` filas (None: todas) para no salirse de la pantalla."""
+        todas = getattr(self, "_todas", self.acciones)
+        self.acciones = list(todas if maximo is None else todas[:max(1, maximo)])
+        self.elegida = min(self.elegida, max(0, len(self.acciones) - 1))
         self.setFixedHeight(self.alto_necesario())
         self.update()
 
@@ -115,8 +133,19 @@ class ListaResultados(QtWidgets.QWidget):
             self.elegida = fila
             self.update()
 
+    def zona_estrella(self, fila):
+        """El rectángulo de la estrella de la fila ``fila`` (a la derecha)."""
+        y = self._y0() + fila * ALTO_FILA
+        return QtCore.QRectF(self.width() - MARGEN - 28, y + 6, 24, ALTO_FILA - 12)
+
     def mousePressEvent(self, evento):
         fila = self.fila_en(posicion_local(evento))
+        if (evento.button() == Qt.LeftButton and fila is not None and self.al_favorito is not None
+                and self.zona_estrella(fila).contains(QtCore.QPointF(posicion_local(evento)))):
+            self.al_favorito(self.acciones[fila])
+            self.update()
+            evento.accept()
+            return
         if evento.button() == Qt.LeftButton and fila is not None:
             self._pulsada = fila
             self._inicio_arrastre = posicion_local(evento)
@@ -189,7 +218,7 @@ class ListaResultados(QtWidgets.QWidget):
             pintor.end()
             return
 
-        ancho_texto = self.width() - 2 * MARGEN - 46
+        ancho_texto = self.width() - 2 * MARGEN - 46 - (26 if self.al_favorito is not None else 0)
         metrica = QtGui.QFontMetrics(pequena)
         for i, accion in enumerate(self.acciones):
             y = self._y0() + i * ALTO_FILA
@@ -232,15 +261,24 @@ class ListaResultados(QtWidgets.QWidget):
                 pintor.drawText(QtCore.QPointF(x, y + 17), trozo)
                 x += QtGui.QFontMetrics(negrita if marca else fuente).horizontalAdvance(trozo)
             # Debajo: nombre en español, menú de Maya y nombre del comando
-            detalle = " · ".join(p for p in (accion.get("traduccion", ""), accion["categoria"],
+            detalle = " · ".join(p for p in (accion.get("traduccion", "") or accion.get("etiqueta", ""),
+                                             accion.get("menu", "") or accion["categoria"],
                                              accion["nombre"] if accion["nombre"] != accion["categoria"] else "")
                                  if p)
-            # A la derecha: el atajo, si tiene
+            # A la derecha: la estrella (llena si es favorita; vacía solo en la fila elegida) y el atajo
+            derecha = 10
+            if self.al_favorito is not None:
+                derecha = 36
+                favorita = self.es_favorita(accion)
+                if favorita or elegida:
+                    pintor.setFont(fuente)
+                    pintor.setPen(COLOR_ESTRELLA if favorita else COLOR_DETALLE_ELEGIDO)
+                    pintor.drawText(self.zona_estrella(i), Qt.AlignCenter, "\u2605" if favorita else "\u2606")
             atajo = accion.get("atajo", "")
             if atajo:
                 pintor.setFont(pequena)
                 pintor.setPen(COLOR_DETALLE_ELEGIDO if elegida else COLOR_PISTA)
-                pintor.drawText(QtCore.QRectF(fila.left(), y, fila.width() - 10, 26),
+                pintor.drawText(QtCore.QRectF(fila.left(), y, fila.width() - derecha, 26),
                                 Qt.AlignRight | Qt.AlignVCenter, atajo)
             pintor.setFont(pequena)
             pintor.setPen(COLOR_DETALLE_ELEGIDO if elegida else COLOR_DETALLE)
@@ -267,10 +305,12 @@ class Buscador(QtWidgets.QWidget):
     - ``acciones()``: lista de acciones (ver ``busqueda``); se pide la primera vez.
     - ``al_ejecutar(accion, opciones=False)``: se eligió una acción (con Mayúsculas, ``opciones``).
     - ``recientes()``: las usadas hace poco.
+    - ``favoritos()`` y ``al_favorito(accion)``: las marcadas con estrella y el clic en la estrella.
     - ``al_terminar()``: se ejecutó o se pulsó Esc; devuelve el teclado a Maya.
     """
 
-    def __init__(self, acciones, al_ejecutar, recientes=None, al_terminar=None, padre=None, buscar_icono=None):
+    def __init__(self, acciones, al_ejecutar, recientes=None, al_terminar=None, padre=None, buscar_icono=None,
+                 favoritos=None, al_favorito=None):
         super(Buscador, self).__init__(padre)
         _ventana_flotante(self, acepta_foco=True)
         self.setObjectName("RadialBuscador")
@@ -291,8 +331,9 @@ class Buscador(QtWidgets.QWidget):
         self.campo.setFrame(False)
         self.campo.setFocusPolicy(Qt.ClickFocus)
         self.campo.setAttribute(Qt.WA_MacShowFocusRect, False)
-        self.campo.setStyleSheet("QLineEdit { background: transparent; border: none; color: #f2f2f2; "
-                                 "font-size: 13px; selection-background-color: #5a6578; }")
+        self.campo.setStyleSheet("QLineEdit {{ background: transparent; border: none; color: {}; "
+                                 "font-size: 13px; selection-background-color: #5a6578; }}".format(
+                                     COLOR_TEXTO.name()))
         paleta = self.campo.palette()
         paleta.setColor(QtGui.QPalette.PlaceholderText, COLOR_PISTA)
         self.campo.setPalette(paleta)
@@ -300,8 +341,13 @@ class Buscador(QtWidgets.QWidget):
         self.campo.installEventFilter(self)
         self._lupa = None
 
+        self._favoritos = favoritos or (lambda: [])
+        self._al_favorito = al_favorito
         self.lista = ListaResultados(self.ejecutar, padre)
         self.lista.buscar_icono = buscar_icono
+        if al_favorito is not None:
+            self.lista.es_favorita = lambda accion: busqueda.es_favorita(self._favoritos(), accion)
+            self.lista.al_favorito = self._alternar_favorito
 
     # --- Seguir al menú -------------------------------------------------------
 
@@ -351,6 +397,7 @@ class Buscador(QtWidgets.QWidget):
         zona = self._zona(QtCore.QPoint(centro_x, y))
         if zona is not None and y + self.height() > zona.bottom():
             y = arriba.y() - self.height() - SEPARACION  # no cabe debajo: encima del menú
+        self._sitio = QtCore.QPoint(x, y)
         self.move(x, y)
         self._colocar_lista()
 
@@ -360,14 +407,36 @@ class Buscador(QtWidgets.QWidget):
         return pantalla.availableGeometry() if pantalla is not None else None
 
     def _colocar_lista(self):
+        """La lista va siempre pegada debajo de la barra, sin taparla.
+
+        Si no cabe entera, se queda con las filas que caben; solo si caben menos de tres se
+        abre hacia arriba. Se usa el sitio pedido para la barra (``_sitio``), no el que diga
+        la ventana, que en macOS puede ir un paso por detrás mientras se mueve.
+        """
         lista = self.lista
+        if not sigue_vivo(lista):
+            return
         lista.setFixedWidth(max(self.width(), ANCHO_RADIAL))
-        x = self.x() + (self.width() - lista.width()) // 2
-        y = self.y() + self.height() + 4
-        zona = self._zona(self.geometry().center())
+        sitio = getattr(self, "_sitio", None) or self.pos()
+        arriba, abajo = sitio.y(), sitio.y() + self.height()
+        x = sitio.x() + (self.width() - lista.width()) // 2
+        zona = self._zona(QtCore.QPoint(sitio.x() + self.width() // 2, abajo))
+        lista.ajustar_filas(None)
+        y = abajo + 4
         if zona is not None and y + lista.height() > zona.bottom():
-            y = self.y() - lista.height() - 4  # se abre hacia arriba
+            caben = lista.filas_que_caben(zona.bottom() - y)
+            if caben >= 3:
+                lista.ajustar_filas(caben)
+            else:
+                lista.ajustar_filas(lista.filas_que_caben(arriba - 4 - zona.top()))
+                y = arriba - lista.height() - 4  # se abre hacia arriba
         lista.move(x, y)
+
+    def moveEvent(self, evento):
+        super(Buscador, self).moveEvent(evento)
+        self._sitio = self.pos()
+        if sigue_vivo(self.lista) and self.lista.isVisible():
+            self._colocar_lista()
 
     def resizeEvent(self, evento):
         self.campo.setGeometry(34, 1, self.width() - 34 - 12, ALTO_CAMPO)
@@ -440,21 +509,33 @@ class Buscador(QtWidgets.QWidget):
     def olvidar_acciones(self):
         self._acciones = None
 
+    def _alternar_favorito(self, accion):
+        self._al_favorito(accion)
+        if not self.campo.text().strip():
+            self._buscar("")  # sin texto la lista es la de favoritas: se pone al día
+
     def _buscar(self, texto):
         texto = texto.strip()
         if texto:
             recientes = [busqueda.clave(a) for a in self._recientes()]
-            resultados = busqueda.buscar(self.acciones(), texto, recientes)
+            favoritos = [busqueda.clave(a) for a in self._favoritos()]
+            resultados = busqueda.buscar(self.acciones(), texto, recientes, favoritos=favoritos)
             self.lista.fijar(resultados, texto, vacio=t("buscador_nada", texto=texto))
         else:
-            recientes = self._recientes()
-            if not recientes:
+            favoritos = self._favoritos()
+            claves = {busqueda.clave(a) for a in favoritos}
+            recientes = [a for a in self._recientes() if busqueda.clave(a) not in claves]
+            if not favoritos and not recientes:
                 self.cerrar_lista()
                 return
-            self.lista.fijar(recientes, "", titulo=t("buscador_recientes"))
+            titulo = " · ".join(n for n, lista in ((t("buscador_favoritos"), favoritos),
+                                                   (t("buscador_recientes"), recientes)) if lista)
+            self.lista.fijar(list(favoritos) + recientes, "", titulo=titulo)
         self._colocar_lista()
         self.lista.show()
         self.lista.raise_()
+        # Por si la ventana se movió entre medias (macOS coloca las ventanas un poco después).
+        QtCore.QTimer.singleShot(0, self._colocar_lista)
 
     def cerrar_lista(self):
         if sigue_vivo(self.lista):

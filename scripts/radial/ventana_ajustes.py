@@ -9,7 +9,7 @@ from radial import automatico
 from radial import detector_tab as dt
 from radial import radiales as rd
 from radial.i18n import t
-from radial.qt import QtCore, QtWidgets
+from radial.qt import QtCore, QtGui, QtWidgets
 
 Qt = QtCore.Qt
 
@@ -128,7 +128,8 @@ class VentanaAjustes(QtWidgets.QDialog):
 
     def __init__(self, apariencia, forma, vertical, ventana_ms, al_apariencia=None, al_forma=None,
                  al_velocidad=None, padre=None, buscador=True, al_buscador=None, opciones=None,
-                 al_opcion=None, al_reglas=None, extra=None, al_extra=None):
+                 al_opcion=None, al_reglas=None, extra=None, al_extra=None, cantidad=None, al_cantidad=None,
+                 atajo="", al_atajo=None, aspecto=None, al_aspecto=None):
         super(VentanaAjustes, self).__init__(padre)
         self.setWindowTitle(t("ajustes_titulo"))
         self.setObjectName("RadialAjustes")
@@ -140,6 +141,9 @@ class VentanaAjustes(QtWidgets.QDialog):
         self._al_opcion = al_opcion
         self._al_reglas = al_reglas
         self._al_extra = al_extra
+        self._al_cantidad = al_cantidad
+        self._al_atajo = al_atajo
+        self._al_aspecto = al_aspecto
         opciones = dict(opciones or {})
         self.apariencia = rd.normalizar_apariencia(apariencia)
 
@@ -204,9 +208,38 @@ class VentanaAjustes(QtWidgets.QDialog):
         self.buscador.toggled.connect(lambda valor: self._al_buscador and self._al_buscador(bool(valor)))
         formulario.addRow(t("ajustes_buscador"), self.buscador)
 
+        self.cantidad = QtWidgets.QSpinBox()
+        self.cantidad.setRange(rd.MIN_BOTONES, rd.MAX_BOTONES)
+        self.cantidad.setValue(rd.normalizar_cantidad(cantidad))
+        self.cantidad.valueChanged.connect(lambda valor: self._al_cantidad and self._al_cantidad(int(valor)))
+        fila = QtWidgets.QHBoxLayout()
+        fila.addWidget(self.cantidad)
+        fila.addStretch(1)
+        formulario.addRow(t("ajustes_cantidad"), fila)
+
+        self.atajo = QtWidgets.QKeySequenceEdit()
+        if hasattr(self.atajo, "setMaximumSequenceLength"):
+            self.atajo.setMaximumSequenceLength(1)
+        self.atajo.setKeySequence(QtGui.QKeySequence(atajo or ""))
+        self.atajo.editingFinished.connect(self._atajo_elegido)
+        self.quitar_atajo = QtWidgets.QPushButton(t("ajustes_clase_quitar"))
+        self.quitar_atajo.clicked.connect(lambda *_: self._fijar_atajo(""))
+        fila = QtWidgets.QHBoxLayout()
+        fila.addWidget(self.atajo, 1)
+        fila.addWidget(self.quitar_atajo)
+        formulario.addRow(t("ajustes_atajo"), fila)
+        self.nota_atajo = QtWidgets.QLabel(t("ajustes_atajo_ayuda"))
+        self.nota_atajo.setWordWrap(True)
+        self.nota_atajo.setEnabled(False)
+        formulario.addRow("", self.nota_atajo)
+
         capa.addStretch(1)
         grupo = QtWidgets.QWidget()
         opciones_capa = QtWidgets.QVBoxLayout(grupo)
+        self.nota_fijadas = QtWidgets.QLabel("\U0001F512 " + t("ajustes_fijadas_nota"))
+        self.nota_fijadas.setWordWrap(True)
+        self.nota_fijadas.setVisible(False)
+        opciones_capa.addWidget(self.nota_fijadas)
         self.casillas = {}
         for clave in OPCIONES:
             casilla = QtWidgets.QCheckBox(t("ajustes_" + clave))
@@ -252,6 +285,8 @@ class VentanaAjustes(QtWidgets.QDialog):
 
         self.pestanas.addTab(self._grupo_extra(), t("ajustes_extra"))
         self.fijar_extra(extra or {})
+        self.pestanas.addTab(self._grupo_aspecto(aspecto or {}), t("ajustes_aspecto"))
+        self._atajo_bueno = atajo or ""
         capa = exterior
 
 
@@ -271,7 +306,28 @@ class VentanaAjustes(QtWidgets.QDialog):
         cerrar.clicked.connect(self.close)
         self.resize(self.sizeHint())  # que las notas de varias líneas no se corten
 
-    def fijar(self, apariencia, forma, vertical, ventana_ms):
+    def _atajo_elegido(self):
+        texto = self.atajo.keySequence().toString(QtGui.QKeySequence.PortableText)
+        self._fijar_atajo(texto)
+
+    def _fijar_atajo(self, texto):
+        """Pide el atajo a quien abre la ventana; si no se puede, enseña por qué y lo deja como estaba."""
+        error = self._al_atajo(texto) if self._al_atajo else ""
+        if error:
+            self.nota_atajo.setText(error)
+            self.nota_atajo.setEnabled(True)
+            self.atajo.setKeySequence(QtGui.QKeySequence(getattr(self, "_atajo_bueno", "")))
+            return
+        self._atajo_bueno = texto
+        self.atajo.setKeySequence(QtGui.QKeySequence(texto))
+        self.nota_atajo.setText(t("ajustes_atajo_ayuda"))
+        self.nota_atajo.setEnabled(False)
+
+    def fijar(self, apariencia, forma, vertical, ventana_ms, cantidad=None):
+        if cantidad is not None:
+            self.cantidad.blockSignals(True)
+            self.cantidad.setValue(rd.normalizar_cantidad(cantidad))
+            self.cantidad.blockSignals(False)
         self.apariencia = rd.normalizar_apariencia(apariencia)
         for clave, deslizador in self.deslizadores.items():
             deslizador.fijar(self.apariencia[clave])
@@ -293,8 +349,44 @@ class VentanaAjustes(QtWidgets.QDialog):
                 widget.setEnabled(not pill)
         for widget in self._filas["pill_boton"]:
             widget.setEnabled(pill)
-        self.horizontal.setEnabled(pill)
-        self.vertical.setEnabled(pill)
+        bloqueadas = getattr(self, "bloqueadas", {})
+        self.horizontal.setEnabled(pill and "pill_vertical" not in bloqueadas)
+        self.vertical.setEnabled(pill and "pill_vertical" not in bloqueadas)
+
+    def fijar_bloqueadas(self, fijadas):
+        """Opciones que fija el profesor (carpeta de clase): se ven con su valor pero no se pueden cambiar."""
+        self.bloqueadas = dict(fijadas or {})
+        b = self.bloqueadas
+        controles = {
+            "forma": [self.forma_radial, self.forma_pill],
+            "ventana_ms": [self.velocidad],
+            "buscador": [self.buscador],
+        }
+        for clave, casilla in self.casillas.items():
+            controles[clave] = [casilla]
+        for clave, widgets in controles.items():
+            for widget in widgets:
+                widget.setEnabled(clave not in b)
+                widget.setToolTip(t("ajustes_fijada") if clave in b else "")
+        for clave, casilla in [("buscador", self.buscador)] + list(self.casillas.items()):
+            if clave in b:
+                casilla.blockSignals(True)
+                casilla.setChecked(bool(b[clave]))
+                casilla.blockSignals(False)
+        if "automatico" in b:
+            self.boton_reglas.setEnabled(bool(b["automatico"]))
+        if "ventana_ms" in b:
+            self.velocidad.fijar(dt.limitar_ventana(b["ventana_ms"]))
+        if "forma" in b or "pill_vertical" in b:
+            forma = b.get("forma", self.forma())
+            vertical = b.get("pill_vertical", self.vertical.isChecked())
+            for boton, valor in ((self.forma_radial, forma == "radial"), (self.forma_pill, forma == "pill"),
+                                 (self.horizontal, not vertical), (self.vertical, vertical)):
+                boton.blockSignals(True)
+                boton.setChecked(valor)
+                boton.blockSignals(False)
+        self.nota_fijadas.setVisible(bool(b))
+        self._mostrar_filas()
 
     def _apariencia_cambiada(self, clave, valor):
         self.apariencia[clave] = valor
@@ -306,6 +398,106 @@ class VentanaAjustes(QtWidgets.QDialog):
         self._mostrar_filas()
         if self._al_forma:
             self._al_forma(self.forma(), self.vertical.isChecked())
+
+    # --- Aspecto ---------------------------------------------------------------
+
+    def _grupo_aspecto(self, aspecto):
+        from radial import tema
+        grupo = QtWidgets.QWidget()
+        capa = QtWidgets.QVBoxLayout(grupo)
+        formulario = QtWidgets.QFormLayout()
+        capa.addLayout(formulario)
+
+        self.tema_oscuro = QtWidgets.QRadioButton(t("tema_oscuro"))
+        self.tema_claro = QtWidgets.QRadioButton(t("tema_claro"))
+        (self.tema_claro if aspecto.get("tema") == "claro" else self.tema_oscuro).setChecked(True)
+        grupo_tema = QtWidgets.QButtonGroup(grupo)
+        fila = QtWidgets.QHBoxLayout()
+        for boton in (self.tema_oscuro, self.tema_claro):
+            grupo_tema.addButton(boton)
+            fila.addWidget(boton)
+        fila.addStretch(1)
+        formulario.addRow(t("ajustes_tema"), fila)
+        self.tema_claro.toggled.connect(
+            lambda claro: self._aspecto("tema", "claro" if claro else "oscuro"))
+
+        self.iconos_propios = QtWidgets.QRadioButton(t("iconos_propios"))
+        self.iconos_maya = QtWidgets.QRadioButton(t("iconos_maya"))
+        (self.iconos_maya if aspecto.get("iconos") == "maya" else self.iconos_propios).setChecked(True)
+        grupo_iconos = QtWidgets.QButtonGroup(grupo)
+        fila = QtWidgets.QHBoxLayout()
+        for boton in (self.iconos_propios, self.iconos_maya):
+            grupo_iconos.addButton(boton)
+            fila.addWidget(boton)
+        fila.addStretch(1)
+        formulario.addRow(t("ajustes_iconos"), fila)
+        self.iconos_maya.toggled.connect(lambda maya: self._aspecto("iconos", "maya" if maya else "propios"))
+
+        self.acento = tema.normalizar_acento(aspecto.get("acento", ""))
+        self.muestras = {}
+        fila = QtWidgets.QHBoxLayout()
+        fila.setSpacing(6)
+        for color, nombre in tema.ACENTOS:
+            muestra = QtWidgets.QToolButton()
+            muestra.setCheckable(True)
+            muestra.setAutoExclusive(True)
+            muestra.setFixedSize(26, 26)
+            muestra.setToolTip(t(nombre))
+            relleno = color or "qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0.49 #f4f4f4, stop:0.51 #1e1f23)"
+            muestra.setStyleSheet("QToolButton {{ background: {}; border: 1px solid rgba(128,128,128,120); "
+                                  "border-radius: 13px; }} QToolButton:checked {{ border: 3px solid palette(highlight); }}"
+                                  .format(relleno))
+            muestra.clicked.connect(lambda *_, c=color: self._elegir_acento(c))
+            self.muestras[color] = muestra
+            fila.addWidget(muestra)
+        self.otro_acento = QtWidgets.QPushButton(t("acento_otro"))
+        self.otro_acento.clicked.connect(self._otro_acento)
+        fila.addWidget(self.otro_acento)
+        fila.addStretch(1)
+        formulario.addRow(t("ajustes_acento"), fila)
+        self._marcar_acento()
+
+        self.idioma = QtWidgets.QComboBox()
+        for codigo, nombre in aspecto.get("idiomas", []):
+            self.idioma.addItem(nombre, codigo)
+        indice = self.idioma.findData(aspecto.get("idioma", "es"))
+        self.idioma.setCurrentIndex(max(0, indice))
+        self.idioma.currentIndexChanged.connect(lambda *_: self._aspecto("idioma", self.idioma.currentData()))
+        fila = QtWidgets.QHBoxLayout()
+        fila.addWidget(self.idioma)
+        fila.addStretch(1)
+        formulario.addRow(t("ajustes_idioma"), fila)
+        nota = QtWidgets.QLabel(t("ajustes_aspecto_ayuda"))
+        nota.setWordWrap(True)
+        nota.setEnabled(False)
+        capa.addWidget(nota)
+        capa.addStretch(1)
+        return grupo
+
+    def _marcar_acento(self):
+        muestra = self.muestras.get(self.acento)
+        for boton in self.muestras.values():
+            boton.setAutoExclusive(False)
+            boton.setChecked(boton is muestra)
+            boton.setAutoExclusive(True)
+        self.otro_acento.setText(t("acento_otro") if muestra is not None or not self.acento
+                                 else "{} {}".format(t("acento_otro"), self.acento))
+
+    def _elegir_acento(self, color):
+        from radial import tema
+        self.acento = tema.normalizar_acento(color)
+        self._marcar_acento()
+        self._aspecto("acento", self.acento)
+
+    def _otro_acento(self):
+        inicial = QtGui.QColor(self.acento or "#4c8dff")
+        color = QtWidgets.QColorDialog.getColor(inicial, self, t("ajustes_acento"))
+        if color.isValid():
+            self._elegir_acento(color.name())
+
+    def _aspecto(self, clave, valor):
+        if self._al_aspecto:
+            self._al_aspecto(clave, valor)
 
     # --- Pill extra -------------------------------------------------------------
 
@@ -327,6 +519,14 @@ class VentanaAjustes(QtWidgets.QDialog):
         self.extra_radial.activated.connect(
             lambda indice: self._extra("radial", self.extra_radial.itemData(indice)))
         formulario.addRow(t("ajustes_extra_radial"), self.extra_radial)
+        self.extra_cantidad = QtWidgets.QSpinBox()
+        self.extra_cantidad.setRange(rd.MIN_BOTONES, rd.MAX_BOTONES)
+        self.extra_cantidad.setValue(rd.NUM_BOTONES)
+        self.extra_cantidad.valueChanged.connect(lambda valor: self._extra("cantidad", int(valor)))
+        fila = QtWidgets.QHBoxLayout()
+        fila.addWidget(self.extra_cantidad)
+        fila.addStretch(1)
+        formulario.addRow(t("ajustes_extra_cantidad"), fila)
         self.extra_horizontal = QtWidgets.QRadioButton(t("pill_horizontal"))
         self.extra_vertical = QtWidgets.QRadioButton(t("pill_vertical"))
         orientacion = QtWidgets.QButtonGroup(grupo)
@@ -358,7 +558,8 @@ class VentanaAjustes(QtWidgets.QDialog):
         """Pone los controles de la pill extra: activa, radial, vertical, apariencia y radiales."""
         self.extra = dict(extra)
         self.extra["apariencia"] = rd.normalizar_apariencia(extra.get("apariencia"))
-        widgets = [self.extra_activa, self.extra_radial, self.extra_vertical, self.extra_horizontal]
+        widgets = [self.extra_activa, self.extra_radial, self.extra_vertical, self.extra_horizontal,
+                   self.extra_cantidad]
         for widget in widgets:
             widget.blockSignals(True)
         self.extra_activa.setChecked(bool(extra.get("activa")))
@@ -366,6 +567,7 @@ class VentanaAjustes(QtWidgets.QDialog):
         for identificador, nombre in extra.get("radiales", []):
             self.extra_radial.addItem(nombre, identificador)
         self.extra_radial.setCurrentIndex(max(0, self.extra_radial.findData(extra.get("radial"))))
+        self.extra_cantidad.setValue(rd.normalizar_cantidad(extra.get("cantidad")))
         self.extra_vertical.setChecked(bool(extra.get("vertical")))
         self.extra_horizontal.setChecked(not extra.get("vertical"))
         for widget in widgets:

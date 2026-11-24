@@ -92,6 +92,96 @@ class FuentesMaya(object):
             boton["icono"] = propio
         return boton
 
+    def menus(self, profundidad=3):
+        """Lista de (ruta, etiqueta, botón) con las órdenes de los menús de la ventana de Maya.
+
+        ``ruta`` es la lista de menús hasta la orden (["Modify", "Pivot"]). Maya crea
+        los menús al abrirlos: los que aún están vacíos se crean aquí (lo mismo que hace Maya).
+        """
+        try:
+            principales = cmds.window("MayaWindow", query=True, menuArray=True) or []
+        except RuntimeError:
+            return []
+        resultado = []
+        for menu in principales:
+            menu = menu if "|" in menu else "MayaWindow|" + menu
+            try:
+                etiqueta = (cmds.menu(menu, query=True, label=True) or "").replace("&", "")
+            except RuntimeError:
+                continue
+            self._recorrer_menu(menu, [etiqueta], resultado, profundidad, es_menu=True)
+        return resultado
+
+    def _recorrer_menu(self, menu, ruta, resultado, profundidad, es_menu=False):
+        consulta = cmds.menu if es_menu else cmds.menuItem
+        try:
+            hijos = consulta(menu, query=True, itemArray=True) or []
+            if not hijos:
+                construir = consulta(menu, query=True, postMenuCommand=True)
+                if isinstance(construir, str) and construir.strip():
+                    mel.eval(construir)
+                    hijos = consulta(menu, query=True, itemArray=True) or []
+        except RuntimeError:
+            return
+        for hijo in hijos:
+            completo = menu + "|" + hijo
+            try:
+                if cmds.menuItem(completo, query=True, divider=True) or \
+                        cmds.menuItem(completo, query=True, optionBox=True):
+                    continue
+                etiqueta = (cmds.menuItem(completo, query=True, label=True) or "").replace("&", "").strip()
+                if not etiqueta:
+                    continue
+                if cmds.menuItem(completo, query=True, subMenu=True):
+                    if profundidad > 1:
+                        self._recorrer_menu(completo, ruta + [etiqueta], resultado, profundidad - 1)
+                    continue
+                boton = self._boton_menu(completo)
+            except RuntimeError:
+                continue
+            if boton:
+                resultado.append((list(ruta), etiqueta.rstrip(".…").strip(), boton))
+
+    @staticmethod
+    def _boton_menu(item):
+        try:
+            orden = cmds.menuItem(item, query=True, runTimeCommand=True) or ""
+        except (RuntimeError, TypeError):
+            orden = ""
+        tipo = "comando" if orden else "mel"
+        if not orden:
+            orden = cmds.menuItem(item, query=True, command=True)
+            if not isinstance(orden, str) or not orden.strip():
+                return None  # una función de Python: no se puede guardar en un botón
+            if (cmds.menuItem(item, query=True, sourceType=True) or "mel").lower() == "python":
+                tipo = "python"
+        imagen = cmds.menuItem(item, query=True, image=True) or ""
+        descripcion = cmds.menuItem(item, query=True, annotation=True) or ""
+        if imagen and not os.path.isfile(imagen) and not imagen.startswith(":"):
+            imagen = ":/" + imagen
+        return {"tipo": tipo, "accion": orden, "icono": imagen, "descripcion": descripcion}
+
+    def scripts(self):
+        """Rutas de los .py y .mel de las carpetas de scripts del usuario."""
+        from radial import busqueda
+        carpetas = []
+        for clave in ("userScriptDir", "userAppDir"):
+            try:
+                carpeta = cmds.internalVar(**{clave: True}) or ""
+            except (RuntimeError, TypeError):
+                continue
+            if clave == "userAppDir":
+                carpeta = os.path.join(carpeta, "scripts")
+            if carpeta and os.path.isdir(carpeta) and os.path.normpath(carpeta) not in carpetas:
+                carpetas.append(os.path.normpath(carpeta))
+        rutas = []
+        for carpeta in carpetas:
+            for archivo in sorted(os.listdir(carpeta)):
+                ruta = os.path.join(carpeta, archivo)
+                if busqueda.es_script(archivo) and os.path.isfile(ruta):
+                    rutas.append(ruta)
+        return rutas
+
     def iconos_maya(self, filtro="", limite=400):
         """Rutas de iconos de Maya (``:/nombre.png``) que contienen ``filtro``."""
         patron = "*{}*.png".format(filtro.strip()) if filtro.strip() else "*.png"
@@ -147,6 +237,7 @@ def _texto_atajo(tecla):
         partes.append("Cmd")
     letra = tecla[0]
     if len(letra) == 1 and letra.isupper():
-        partes.append("Mayús")
+        from radial.i18n import t
+        partes.append(t("tecla_mayus"))
     partes.append(letra.upper() if len(letra) == 1 else letra)
     return "+".join(partes)

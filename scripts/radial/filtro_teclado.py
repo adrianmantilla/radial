@@ -18,7 +18,7 @@ QEvent = QtCore.QEvent
 
 _TECLAS_MODIFICADORAS = {Qt.Key_Shift, Qt.Key_Control, Qt.Key_Meta, Qt.Key_Alt, Qt.Key_AltGr,
                          Qt.Key_CapsLock}
-_TIPOS = (QEvent.ShortcutOverride, QEvent.KeyPress, QEvent.MouseButtonPress)
+_TIPOS = (QEvent.ShortcutOverride, QEvent.KeyPress, QEvent.KeyRelease, QEvent.MouseButtonPress)
 _WIDGETS_DE_TEXTO = (QtWidgets.QLineEdit, QtWidgets.QTextEdit, QtWidgets.QPlainTextEdit,
                      QtWidgets.QAbstractSpinBox)
 
@@ -43,9 +43,14 @@ class FiltroTeclado(QtCore.QObject):
     - ``puede_contar(es_segundo)`` dice si un Tab cuenta en este momento.
       ``es_segundo`` es True cuando este Tab completaría un doble Tab.
     - ``al_doble_tab()`` se llama (justo después) cuando hay doble Tab.
+    - ``al_soltar_tab()`` se llama al soltar ese segundo Tab (para el gesto).
+
+    Mientras el segundo Tab sigue pulsado, su auto-repetición y su soltar también
+    se los queda el filtro: Maya no ve nada de esa pulsación, así que mantener Tab
+    (que en Maya es suyo) solo cuenta cuando no hay doble Tab.
     """
 
-    def __init__(self, puede_contar, al_doble_tab, ventana_ms=250, padre=None):
+    def __init__(self, puede_contar, al_doble_tab, ventana_ms=250, padre=None, al_soltar_tab=None):
         super(FiltroTeclado, self).__init__(padre)
         self.detector = DetectorDobleTab(ventana_ms)
         self._puede_contar = puede_contar
@@ -55,6 +60,8 @@ class FiltroTeclado(QtCore.QObject):
         self._quedarse = False
         self._foco_primer_tab = None
         self._objetivos = []
+        self._al_soltar_tab = al_soltar_tab
+        self.manteniendo = False  # el segundo Tab del doble Tab sigue pulsado
 
     def instalar(self, ventanas=None):
         """Empieza a escuchar.
@@ -87,7 +94,7 @@ class FiltroTeclado(QtCore.QObject):
         tipo = evento.type()
         if tipo not in _TIPOS:
             return False
-        if tipo == QEvent.ShortcutOverride or tipo == QEvent.KeyPress:
+        if tipo in (QEvent.ShortcutOverride, QEvent.KeyPress, QEvent.KeyRelease):
             try:
                 return self._tecla(tipo, evento)
             except Exception:  # un error aquí no puede bloquear el teclado de Maya
@@ -103,6 +110,11 @@ class FiltroTeclado(QtCore.QObject):
         return self._momento_decision is not None and ahora - self._momento_decision < 15
 
     def _tecla(self, tipo, evento):
+        if tipo == QEvent.KeyRelease:
+            return self._soltar(evento)
+        if self.manteniendo and evento.key() == Qt.Key_Tab and evento.isAutoRepeat():
+            evento.accept()
+            return True  # la auto-repetición del segundo Tab no llega a Maya
         if evento.key() != Qt.Key_Tab:
             if tipo == QEvent.KeyPress and evento.key() not in _TECLAS_MODIFICADORAS:
                 self.detector.olvidar()
@@ -111,6 +123,7 @@ class FiltroTeclado(QtCore.QObject):
         ahora = _ahora_ms()
         sello = evento.timestamp()
         if not self._misma_pulsacion(sello, ahora):
+            self.manteniendo = False  # una pulsación nueva: el gesto anterior ya acabó
             self._sello = sello
             self._momento_decision = ahora
             self._quedarse = self._decidir(evento, sello or ahora)
@@ -132,7 +145,18 @@ class FiltroTeclado(QtCore.QObject):
             return False
         foco = self._foco_primer_tab
         self._foco_primer_tab = None
+        self.manteniendo = True
         QtCore.QTimer.singleShot(0, lambda: self._avisar(foco))
+        return True
+
+    def _soltar(self, evento):
+        if evento.key() != Qt.Key_Tab or not self.manteniendo:
+            return False
+        if not evento.isAutoRepeat():
+            self.manteniendo = False
+            if self._al_soltar_tab is not None:
+                QtCore.QTimer.singleShot(0, self._al_soltar_tab)
+        evento.accept()
         return True
 
     def _avisar(self, foco):

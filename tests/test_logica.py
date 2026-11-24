@@ -224,6 +224,25 @@ class PruebaTextos(unittest.TestCase):
         faltan = usadas - i18n.claves()
         self.assertFalse(faltan, "faltan textos: {}".format(sorted(faltan)))
 
+    def test_ingles_completo(self):
+        import string
+
+        def marcadores(texto):
+            return {campo for _, campo, _, _ in string.Formatter().parse(texto) if campo}
+
+        es, en = i18n._cargar("es"), i18n._cargar("en")
+        self.assertEqual(set(es), set(en), "en.json no tiene las mismas claves que es.json")
+        for clave in es:
+            self.assertEqual(marcadores(es[clave]), marcadores(en[clave]), clave)
+        self.assertEqual(dict(i18n.idiomas()), {"en": "English", "es": "Español"})
+        try:
+            i18n.usar_idioma("en")
+            self.assertEqual(i18n.t("menu_ajustes"), "Settings...")
+            self.assertEqual(i18n.t("reto_final", aciertos=2, total=3), "You got 2 of 3 right.")
+        finally:
+            i18n.usar_idioma("es")
+        self.assertEqual(i18n.t("menu_ajustes"), "Ajustes...")
+
     def test_es_json_valido(self):
         with open(os.path.join(RAIZ, "scripts", "radial", "i18n", "es.json"), encoding="utf-8") as f:
             self.assertTrue(json.load(f))
