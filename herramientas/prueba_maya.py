@@ -111,4 +111,5 @@ if __name__ == "__main__":
         fallos.append("error inesperado")
     print()
     print("RESULTADO: OK" if not fallos else "RESULTADO: {} fallos".format(len(fallos)))
+    sys.stdout.flush()  # os._exit no vacía la salida si va a una tubería
     os._exit(0 if not fallos else 1)
