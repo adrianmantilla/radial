@@ -90,8 +90,12 @@ def main():
     comprobar(len(faltan) <= len(traducidos) // 10,
               "los comandos traducidos existen ({} de {})".format(len(traducidos) - len(faltan), len(traducidos)))
     if faltan:
+        import difflib
         print("        no existen: " + ", ".join(faltan))
-    muestra = ["PolyExtrude", "CenterPivot", "BevelPolygon", "UVEditor", "Hypershade", "CreatePolygonCube",
+        for nombre in faltan:
+            parecidos = difflib.get_close_matches(nombre, sorted(existentes), n=3, cutoff=0.6)
+            print("          {} -> ¿{}?".format(nombre, ", ".join(parecidos) or "nada parecido"))
+    muestra = ["PolyExtrude", "CenterPivot", "BevelPolygon", "TextureViewWindow", "Hypershade", "CreatePolygonCube",
                "FreezeTransformations", "MultiCutTool", "DeleteHistory", "RenderViewWindow"]
     con_icono = {n: fuentes.icono_de_comando(n) for n in muestra}
     comprobar(sum(1 for v in con_icono.values() if v) >= len(muestra) // 2,
@@ -108,7 +112,8 @@ def main():
             comprobar(antes in (True, False), "el interruptor {} se lee".format(clave))
         except Exception as error:  # noqa: BLE001
             comprobar(False, "el interruptor {} se lee ({})".format(clave, error))
-    for clave in ("snap_rejilla", "snap_vertice", "simetria"):
+    sin_interfaz = bool(cmds.about(batch=True))
+    for clave in ("simetria",) if sin_interfaz else ("snap_rejilla", "snap_vertice", "simetria"):
         try:
             antes = interruptores.encendido(clave)
             interruptores.alternar(clave)
@@ -124,6 +129,8 @@ def main():
     except Exception as error:  # noqa: BLE001
         comprobar(False, "el radial automático lee el contexto ({})".format(error))
     print("        workspaces: " + ", ".join(automatico.workspaces_maya()))
+    if sin_interfaz:
+        print("        el imán (rejilla y vértices) solo se puede probar con Maya abierto")
 
     # 1.3: scripts propios, atajo opcional, modo reto, iconos de Maya y lo último que hice
     from radial import atajo, busqueda, grabar, iconos as ico, reto
@@ -143,7 +150,9 @@ def main():
             ocupado or "libre"))
     except Exception as error:  # noqa: BLE001
         comprobar(False, "el atajo opcional comprueba si Maya ya lo usa ({})".format(error))
-    preguntas = reto.preguntas({"PolyExtrude": 5, "Duplicate": 3}, atajos)
+    preguntas = reto.preguntas({"PolyExtrude": 5, "Duplicate": 3}, atajos or {"PolyExtrude": "Ctrl+E"})
+    if not atajos:
+        print("        sin interfaz Maya no carga los atajos: el modo reto se prueba con uno de ejemplo")
     comprobar(bool(preguntas), "el modo reto encuentra atajos que preguntar ({})".format(
         ", ".join("{}={}".format(c, a) for c, a in preguntas[:5])))
     ico.usar_iconos("maya", fuentes.icono_de_comando)

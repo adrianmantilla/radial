@@ -183,17 +183,9 @@
   "es": "Herramienta unir vértices",
   "ayuda": "Arrastra un vértice sobre otro para unirlos."
  },
- "PolyMergeVertex": {
-  "es": "Unir vértices",
-  "ayuda": "Une los vértices seleccionados."
- },
  "MergeToCenter": {
   "es": "Unir al centro",
   "ayuda": "Une los componentes seleccionados en su centro."
- },
- "CollapseFace": {
-  "es": "Colapsar",
-  "ayuda": "Colapsa caras o aristas en un punto."
  },
  "PolygonCollapse": {
   "es": "Colapsar",
@@ -211,7 +203,7 @@
   "es": "Separar componentes",
   "ayuda": "Separa los vértices o aristas seleccionados."
  },
- "PolyAppendTool": {
+ "AppendToPolygonTool": {
   "es": "Añadir polígono",
   "ayuda": "Crea caras nuevas en el borde de una malla."
  },
@@ -236,14 +228,6 @@
   "ayuda": "Junta varias mallas en una sola."
  },
  "SeparatePolygon": {
-  "es": "Separar",
-  "ayuda": "Separa una malla en sus partes sueltas."
- },
- "PolygonCombine": {
-  "es": "Combinar",
-  "ayuda": "Junta varias mallas en una sola."
- },
- "PolygonSeparate": {
   "es": "Separar",
   "ayuda": "Separa una malla en sus partes sueltas."
  },
@@ -291,11 +275,7 @@
   "es": "Corte múltiple",
   "ayuda": "Corta caras dibujando líneas sobre la malla."
  },
- "dR_multiCutTool": {
-  "es": "Corte múltiple",
-  "ayuda": "Corta caras dibujando líneas sobre la malla."
- },
- "dR_connectTool": {
+ "ConnectComponents": {
   "es": "Conectar",
   "ayuda": "Une componentes con aristas nuevas."
  },
@@ -310,10 +290,6 @@
  "OffsetEdgeLoopTool": {
   "es": "Desplazar bucle de aristas",
   "ayuda": "Crea dos bucles a ambos lados del seleccionado."
- },
- "PolySlideEdge": {
-  "es": "Deslizar aristas",
-  "ayuda": "Mueve aristas a lo largo de la malla."
  },
  "SlideEdgeTool": {
   "es": "Deslizar aristas",
@@ -343,13 +319,9 @@
   "es": "Cuña",
   "ayuda": "Extruye caras girando alrededor de una arista."
  },
- "SubdivideFace": {
+ "SubdividePolygon": {
   "es": "Subdividir caras",
   "ayuda": "Divide las caras seleccionadas."
- },
- "PolyAverageVertex": {
-  "es": "Promediar vértices",
-  "ayuda": "Suaviza la posición de los vértices."
  },
  "AverageVertex": {
   "es": "Promediar vértices",
@@ -363,11 +335,11 @@
   "es": "Unificar normales",
   "ayuda": "Hace que todas las caras miren hacia el mismo lado."
  },
- "SoftPolyEdgeElements": {
+ "PolygonSoftenEdge": {
   "es": "Aristas suaves",
   "ayuda": "Suaviza el sombreado de las aristas."
  },
- "HardPolyEdgeElements": {
+ "PolygonHardenEdge": {
   "es": "Aristas duras",
   "ayuda": "Marca aristas duras en el sombreado."
  },
@@ -443,10 +415,6 @@
   "es": "Modificador suave",
   "ayuda": "Deforma una zona con caída suave."
  },
- "LatticeDeformer": {
-  "es": "Lattice",
-  "ayuda": "Crea una caja de deformación alrededor del objeto."
- },
  "CreateLattice": {
   "es": "Lattice",
   "ayuda": "Crea una caja de deformación alrededor del objeto."
@@ -460,10 +428,6 @@
   "ayuda": "Añade un deformador para torcer."
  },
  "TextureViewWindow": {
-  "es": "Editor de UV",
-  "ayuda": "Abre el editor de UV."
- },
- "UVEditor": {
   "es": "Editor de UV",
   "ayuda": "Abre el editor de UV."
  },
@@ -487,17 +451,9 @@
   "es": "Proyección desde la cámara",
   "ayuda": "Crea UV desde el punto de vista de la cámara."
  },
- "UVUnfold": {
-  "es": "Desplegar UV",
-  "ayuda": "Despliega las UV para que no se deformen."
- },
  "UnfoldUV": {
   "es": "Desplegar UV",
   "ayuda": "Despliega las UV para que no se deformen."
- },
- "UVLayout": {
-  "es": "Organizar UV",
-  "ayuda": "Coloca las islas UV dentro del cuadrado 0-1."
  },
  "LayoutUV": {
   "es": "Organizar UV",
@@ -512,10 +468,6 @@
   "ayuda": "Corta las UV por las aristas seleccionadas."
  },
  "SewUVs": {
-  "es": "Coser UV",
-  "ayuda": "Une las UV por las aristas seleccionadas."
- },
- "polySewUV": {
   "es": "Coser UV",
   "ayuda": "Une las UV por las aristas seleccionadas."
  },
@@ -534,10 +486,6 @@
  "ToggleUVTextureImage": {
   "es": "Ver textura en el editor UV",
   "ayuda": "Muestra u oculta la imagen de la textura."
- },
- "UVCheckerMap": {
-  "es": "Patrón de comprobación",
-  "ayuda": "Muestra un patrón de cuadros para ver la deformación."
  },
  "HypershadeWindow": {
   "es": "Hypershade",
@@ -695,17 +643,9 @@
   "es": "Playblast",
   "ayuda": "Graba una vista previa de la animación."
  },
- "Playblast": {
-  "es": "Playblast",
-  "ayuda": "Graba una vista previa de la animación."
- },
- "GhostingOptions": {
+ "GhostSelected": {
   "es": "Papel cebolla",
   "ayuda": "Muestra fotogramas anteriores y siguientes."
- },
- "MotionTrail": {
-  "es": "Trayectoria",
-  "ayuda": "Muestra el recorrido del objeto animado."
  },
  "CreateMotionTrail": {
   "es": "Trayectoria",
@@ -759,14 +699,6 @@
   "es": "Aislar selección",
   "ayuda": "Muestra solo lo seleccionado en el visor."
  },
- "ToggleWireframeOnShaded": {
-  "es": "Malla sobre sombreado",
-  "ayuda": "Muestra la malla encima del sombreado."
- },
- "ToggleXRay": {
-  "es": "Rayos X",
-  "ayuda": "Hace los objetos semitransparentes en el visor."
- },
  "ToggleGrid": {
   "es": "Rejilla",
   "ayuda": "Muestra u oculta la rejilla."
@@ -794,10 +726,6 @@
  "TogglePolyCount": {
   "es": "Contar polígonos",
   "ayuda": "Muestra cuántos polígonos hay en la escena."
- },
- "ToggleHeadsUpDisplay": {
-  "es": "Información en pantalla",
-  "ayuda": "Muestra u oculta la información del visor."
  },
  "SnapToGridPress": {
   "es": "Imán a la rejilla",
