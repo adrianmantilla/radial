@@ -24,9 +24,24 @@ class MenuComun(SoltarBoton):
     al_carpeta = None  # funcion(carpeta) al abrir o cerrar una carpeta
     al_sobre = None    # funcion(boton o None) al pasar el ratón por un botón (modo aprendizaje)
 
+    def num(self):
+        """Cuántos botones tiene el menú (seis salvo que el radial diga otra cosa)."""
+        radial = getattr(self, "radial", None)
+        return len(radial["botones"]) if radial else rd.NUM_BOTONES
+
+    def _ajustar_a_cantidad(self):
+        """Tras cambiar de radial: deja animaciones, estados, carpeta y ratón dentro de los botones que hay."""
+        self._apertura = [0.0] * self.num()
+        self.fijar_estados(self.estados)
+        if self.carpeta is not None and (self.carpeta >= self.num()
+                                         or self.radial["botones"][self.carpeta]["tipo"] != "carpeta"):
+            self.carpeta = None
+        if isinstance(getattr(self, "_sobre", None), int) and self._sobre >= self.num():
+            self._sobre = None
+
     def _iniciar_comun(self):
         self.carpeta = None
-        self.estados = [None] * rd.NUM_BOTONES
+        self.estados = [None] * self.num()
         self._mayus = False
         self._reloj_mayus = QtCore.QTimer(self)
         self._reloj_mayus.setInterval(120)
@@ -53,7 +68,9 @@ class MenuComun(SoltarBoton):
         if self.carpeta is not None:
             boton = self.radial["botones"][self.carpeta]
             if boton["tipo"] == "carpeta":
-                return boton["botones"]
+                # La carpeta tiene seis; se enseñan tantos como huecos tenga el menú.
+                dentro = boton["botones"][:self.num()]
+                return dentro + [rd.boton_vacio() for _ in range(self.num() - len(dentro))]
             self.carpeta = None
         return self.radial["botones"]
 
@@ -71,16 +88,16 @@ class MenuComun(SoltarBoton):
         self._cambio_de_pagina()
 
     def _cambio_de_pagina(self):
-        self.estados = [None] * rd.NUM_BOTONES
+        self.estados = [None] * self.num()
         self._sobre = None
-        self._apertura = [0.0] * rd.NUM_BOTONES
+        self._apertura = [0.0] * self.num()
         if self.al_carpeta is not None:
             self.al_carpeta(self.carpeta)
         self.update()
 
     def fijar_estados(self, estados):
-        estados = list(estados or [])[:rd.NUM_BOTONES]
-        self.estados = estados + [None] * (rd.NUM_BOTONES - len(estados))
+        estados = list(estados or [])[:self.num()]
+        self.estados = estados + [None] * (self.num() - len(estados))
         self.update()
 
     # --- Clic en un botón -------------------------------------------------------

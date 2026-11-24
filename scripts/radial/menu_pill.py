@@ -87,7 +87,7 @@ class MenuPill(MenuComun, QtWidgets.QWidget):
         self.vertical = vertical
 
         self.radial = rd.normalizar({"botones": []})
-        self._apertura = [0.0] * rd.NUM_BOTONES
+        self._apertura = [0.0] * self.num()
         self._sobre = None
         self._pulsado = None
         self._arrastre = None
@@ -106,11 +106,12 @@ class MenuPill(MenuComun, QtWidgets.QWidget):
         return self.radial["apariencia"]
 
     def _geometria(self):
-        return rd.geometria_pill(self.apariencia, self.vertical)
+        return rd.geometria_pill(self.apariencia, self.vertical, self.num())
 
     def usar_radial(self, radial, vertical=None):
         centro = self.centro_global() if self.isVisible() else None
         self.radial = rd.normalizar(radial)
+        self._ajustar_a_cantidad()
         if vertical is not None:
             self.vertical = bool(vertical)
         self._cache = {}
@@ -133,7 +134,8 @@ class MenuPill(MenuComun, QtWidgets.QWidget):
         self._colocar_etiqueta()
 
     def _que_hay(self, punto):
-        return rd.que_hay_en_pill(punto.x() - _BORDE, punto.y() - _BORDE, self.apariencia, self.vertical)
+        return rd.que_hay_en_pill(punto.x() - _BORDE, punto.y() - _BORDE, self.apariencia, self.vertical,
+                                  self.num())
 
     # --- Etiqueta -------------------------------------------------------------
 
@@ -248,7 +250,7 @@ class MenuPill(MenuComun, QtWidgets.QWidget):
         self._arrastre = None
         self._pulsado = None
         self._sobre = None
-        self._apertura = [0.0] * rd.NUM_BOTONES
+        self._apertura = [0.0] * self.num()
         self._reloj.stop()
         self.etiqueta.hide()
         super(MenuPill, self).hideEvent(evento)
@@ -261,7 +263,7 @@ class MenuPill(MenuComun, QtWidgets.QWidget):
 
     def _animar(self):
         quietos = True
-        for i in range(rd.NUM_BOTONES):
+        for i in range(self.num()):
             vacio = self.botones_visibles()[i]["tipo"] == "vacio"
             objetivo = 1.0 if (self._sobre == i and (not vacio or self._soltando)) else 0.0
             actual = self._apertura[i]

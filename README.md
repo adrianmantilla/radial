@@ -109,7 +109,7 @@ En **Radial > Ajustes > Pill extra** (o **Radial > Pill extra**) se activa una *
 independiente del menú del doble Tab: está siempre a la vista mientras la tengas activa y vuelve a salir
 al abrir Maya. Tiene todo lo suyo: su radial de botones (cualquiera de la biblioteca), iconos, carpetas,
 interruptores, tamaño de los botones, opacidad, orientación (horizontal o vertical) y su sitio en la
-pantalla. Se mueve arrastrando los puntitos del extremo y **clic derecho** en ellos abre su configurador
+pantalla, y su **número de botones** (de 2 a 12; los nuevos salen vacíos para configurarlos). Se mueve arrastrando los puntitos del extremo y **clic derecho** en ellos abre su configurador
 (también **Radial > Configurar la pill extra…**). Lo que guardas desde ella se guarda en **Mis radiales**,
 así que puedes usar el mismo juego en el menú y en la pill extra.
 
@@ -190,7 +190,7 @@ JSON con el nombre, los seis botones y la apariencia:
 
 `tipo` es `comando`, `python`, `mel`, `carpeta` o `vacio`. Un botón puede llevar `estado`
 (`"radial:<interruptor>"` o una línea de Python que devuelve True o False); una carpeta lleva sus seis
-botones en `botones` (sin carpetas dentro). Un radial con `"bloqueado": true` no se puede editar. Si faltan botones se rellenan vacíos, y los valores
+botones en `botones` (sin carpetas dentro). Un radial con `"bloqueado": true` no se puede editar. `"cantidad"` (de 2 a 12, seis si no está) es el número de botones. Si faltan botones se rellenan vacíos, y los valores
 fuera de rango se ajustan al cargar.
 
 ## Para desarrollar

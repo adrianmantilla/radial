@@ -363,6 +363,8 @@ def _al_soltar(indice, boton):
     menu = _menu_flotante(crear=False)
     carpeta = menu.carpeta if menu else None
     if carpeta is not None and radial["botones"][carpeta]["tipo"] == "carpeta":
+        if indice >= len(radial["botones"][carpeta]["botones"]):
+            return  # hueco de relleno: las carpetas tienen seis botones
         radial["botones"][carpeta]["botones"][indice] = rd.normalizar_boton(boton, carpeta_permitida=False)
         nuevo = radial["botones"][carpeta]["botones"][indice]
     else:
@@ -507,11 +509,12 @@ def _datos_extra():
     from radial import pill_extra
     return {"activa": pill_extra.ajustes().activa, "vertical": pill_extra.ajustes().vertical,
             "radial": pill_extra.biblioteca().origen, "apariencia": pill_extra.biblioteca().activo["apariencia"],
+            "cantidad": len(pill_extra.biblioteca().activo["botones"]),
             "radiales": _todos_los_radiales()}
 
 
 def cambiar_extra(clave, valor=None):
-    """La pill extra desde Ajustes: activa, radial, vertical, apariencia o configurar."""
+    """La pill extra desde Ajustes: activa, radial, vertical, apariencia, cantidad o configurar."""
     from radial import pill_extra
     if clave == "activa":
         pill_extra.activar(valor)
@@ -521,6 +524,8 @@ def cambiar_extra(clave, valor=None):
         pill_extra.cambiar_vertical(valor)
     elif clave == "apariencia":
         pill_extra.cambiar_apariencia(valor)
+    elif clave == "cantidad":
+        pill_extra.cambiar_cantidad(valor)
     elif clave == "configurar":
         pill_extra.abrir_configurador()
     ventana = _ventana("ventana_ajustes")

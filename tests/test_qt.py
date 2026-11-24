@@ -377,6 +377,23 @@ class PruebaBuscador(unittest.TestCase):
         evento = QtGui.QKeyEvent(QEvent.KeyPress, tecla, Qt.NoModifier)
         APP.sendEvent(self.buscador.campo, evento)
 
+    def test_la_lista_nunca_tapa_la_barra(self):
+        self.menu.show()
+        APP.processEvents()
+        zona = QtGui.QGuiApplication.primaryScreen().availableGeometry()
+        for y in (200, zona.bottom() - 330, zona.bottom() - 200):
+            self.menu.colocar(QtCore.QPoint(500, y))
+            self.buscador.colocar()
+            self._escribir("e")
+            APP.processEvents()
+            barra = self.buscador.geometry()
+            lista = self.buscador.lista.geometry()
+            self.assertFalse(barra.intersects(lista), (y, barra, lista))
+            self.assertLessEqual(lista.bottom(), zona.bottom())
+        # Moverse con la lista abierta la lleva con la barra
+        self.buscador.move(self.buscador.pos() + QtCore.QPoint(0, -40))
+        self.assertFalse(self.buscador.geometry().intersects(self.buscador.lista.geometry()))
+
     def test_sigue_al_menu(self):
         self.assertFalse(self.buscador.isVisible())
         self.menu.show()
@@ -576,6 +593,27 @@ class PruebaCarpetasYEstados(unittest.TestCase):
     def test_al_sobre(self):
         _clic(self.menu, self._punto(1))
         self.assertEqual(self.sobre[0]["texto"], self.menu.botones_visibles()[1]["texto"])
+
+    def test_pill_con_nueve_botones(self):
+        pill = MenuPill(al_ejecutar=lambda i, opciones=False: self.ejecutados.append((i, opciones)),
+                        al_mover=lambda c: None, al_configurar=lambda: None, vertical=False)
+        self.addCleanup(pill.close)
+        seis = pill.width()
+        radial = rd.cambiar_cantidad(_radial_con_carpeta(), 9)
+        radial["botones"][8] = {"texto": "Nueve", "tipo": "mel", "accion": "polyCube;"}
+        pill.usar_radial(radial)
+        pill.show()
+        self.assertEqual(pill.num(), 9)
+        self.assertGreater(pill.width(), seis)
+        x, y, w, h = rd.geometria_pill(pill.apariencia, False, 9)[3][8]
+        _clic(pill, QtCore.QPoint(int(1 + x + w / 2), int(1 + y + h / 2)))
+        self.assertEqual(self.ejecutados[-1], (8, False))
+        pill.fijar_estados([True] * 9)
+        pill.abrir_carpeta(5)
+        self.assertEqual(len(pill.botones_visibles()), 9)  # la carpeta rellena con huecos vacíos
+        self.assertFalse(pill.grab().isNull())
+        pill.usar_radial(rd.cambiar_cantidad(radial, 3))
+        self.assertEqual(len(pill.estados), 3)
 
     def test_pill_con_carpeta(self):
         pill = MenuPill(al_ejecutar=lambda i, opciones=False: None, al_mover=lambda c: None,

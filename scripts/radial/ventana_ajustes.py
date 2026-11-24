@@ -327,6 +327,14 @@ class VentanaAjustes(QtWidgets.QDialog):
         self.extra_radial.activated.connect(
             lambda indice: self._extra("radial", self.extra_radial.itemData(indice)))
         formulario.addRow(t("ajustes_extra_radial"), self.extra_radial)
+        self.extra_cantidad = QtWidgets.QSpinBox()
+        self.extra_cantidad.setRange(rd.MIN_BOTONES, rd.MAX_BOTONES)
+        self.extra_cantidad.setValue(rd.NUM_BOTONES)
+        self.extra_cantidad.valueChanged.connect(lambda valor: self._extra("cantidad", int(valor)))
+        fila = QtWidgets.QHBoxLayout()
+        fila.addWidget(self.extra_cantidad)
+        fila.addStretch(1)
+        formulario.addRow(t("ajustes_extra_cantidad"), fila)
         self.extra_horizontal = QtWidgets.QRadioButton(t("pill_horizontal"))
         self.extra_vertical = QtWidgets.QRadioButton(t("pill_vertical"))
         orientacion = QtWidgets.QButtonGroup(grupo)
@@ -358,7 +366,8 @@ class VentanaAjustes(QtWidgets.QDialog):
         """Pone los controles de la pill extra: activa, radial, vertical, apariencia y radiales."""
         self.extra = dict(extra)
         self.extra["apariencia"] = rd.normalizar_apariencia(extra.get("apariencia"))
-        widgets = [self.extra_activa, self.extra_radial, self.extra_vertical, self.extra_horizontal]
+        widgets = [self.extra_activa, self.extra_radial, self.extra_vertical, self.extra_horizontal,
+                   self.extra_cantidad]
         for widget in widgets:
             widget.blockSignals(True)
         self.extra_activa.setChecked(bool(extra.get("activa")))
@@ -366,6 +375,7 @@ class VentanaAjustes(QtWidgets.QDialog):
         for identificador, nombre in extra.get("radiales", []):
             self.extra_radial.addItem(nombre, identificador)
         self.extra_radial.setCurrentIndex(max(0, self.extra_radial.findData(extra.get("radial"))))
+        self.extra_cantidad.setValue(rd.normalizar_cantidad(extra.get("cantidad")))
         self.extra_vertical.setChecked(bool(extra.get("vertical")))
         self.extra_horizontal.setChecked(not extra.get("vertical"))
         for widget in widgets:
