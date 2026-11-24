@@ -1339,8 +1339,8 @@ def _llenar_forma(*_):
 
 
 def crear_menu():
-    quitar_menu()
-    cmds.menu(MENU, parent="MayaWindow", label=t("menu_titulo"), tearOff=True)
+    from radial import pack
+    pack.crear_menu(MENU, t("menu_titulo"))
     cmds.menuItem(label=t("menu_alternar"), command=lambda *_: alternar())
     cmds.menuItem(label=t("menu_configurar"), command=lambda *_: abrir_configurador())
     cmds.menuItem(label=t("menu_grabar"), command=lambda *_: crear_boton_de_lo_ultimo())
@@ -1365,8 +1365,8 @@ def crear_menu():
 
 
 def quitar_menu():
-    if cmds.menu(MENU, exists=True):
-        cmds.deleteUI(MENU)
+    from radial import pack
+    pack.quitar_menu(MENU)
 
 
 # --- Arranque y parada --------------------------------------------------------
