@@ -39,7 +39,8 @@ def _ventana_flotante(widget, acepta_foco):
     banderas = Qt.Tool | Qt.FramelessWindowHint | Qt.NoDropShadowWindowHint
     if not acepta_foco:
         banderas |= Qt.WindowDoesNotAcceptFocus
-        widget.setAttribute(Qt.WA_ShowWithoutActivating)
+    # Al aparecer nunca se queda con el teclado: solo al hacer clic en el campo.
+    widget.setAttribute(Qt.WA_ShowWithoutActivating)
     widget.setWindowFlags(banderas)
     widget.setAttribute(Qt.WA_TranslucentBackground)
 
@@ -235,6 +236,8 @@ class Buscador(QtWidgets.QWidget):
         self.setObjectName("RadialBuscador")
         self.setWindowTitle("Radial")
         self.setFixedHeight(ALTO_CAMPO + 2)
+        self.setFocusPolicy(Qt.NoFocus)
+        self._editando = False  # True solo tras un clic en el campo
         self._acciones_fuente = acciones
         self._acciones = None
         self._al_ejecutar = al_ejecutar
@@ -246,6 +249,7 @@ class Buscador(QtWidgets.QWidget):
         self.campo = QtWidgets.QLineEdit(self)
         self.campo.setPlaceholderText(t("buscador_pista"))
         self.campo.setFrame(False)
+        self.campo.setFocusPolicy(Qt.ClickFocus)
         self.campo.setAttribute(Qt.WA_MacShowFocusRect, False)
         self.campo.setStyleSheet("QLineEdit { background: transparent; border: none; color: #f2f2f2; "
                                  "font-size: 13px; selection-background-color: #5a6578; }")
@@ -278,6 +282,8 @@ class Buscador(QtWidgets.QWidget):
             self.colocar()
             self.show()
             self.raise_()
+            if not self._editando and self.campo.hasFocus():
+                self._soltar_teclado()
         else:
             self.cerrar_lista()
             self.hide()
@@ -344,10 +350,17 @@ class Buscador(QtWidgets.QWidget):
         if objeto is self.campo:
             if tipo == QEvent.KeyPress:
                 return self._tecla(evento)
-            if tipo == QEvent.FocusIn:
+            if tipo == QEvent.MouseButtonPress:
+                self._editando = True
+            elif tipo == QEvent.FocusIn:
+                if not self._editando and evento.reason() != Qt.MouseFocusReason:
+                    QtCore.QTimer.singleShot(0, self._soltar_teclado)  # no se pidió: se devuelve
+                    return False
+                self._editando = True
                 self.update()
                 self._buscar(self.campo.text())
             elif tipo == QEvent.FocusOut:
+                self._editando = False
                 self.update()
                 QtCore.QTimer.singleShot(200, self._quizas_cerrar)
         return False
@@ -414,11 +427,19 @@ class Buscador(QtWidgets.QWidget):
         """Borra el texto, cierra el desplegable y devuelve el teclado a Maya."""
         self.campo.clear()
         self.cerrar_lista()
-        self.campo.clearFocus()
+        self._soltar_teclado()
+
+    def _soltar_teclado(self):
+        if not sigue_vivo(self):
+            return
+        self._editando = False
+        if self.campo.hasFocus():
+            self.campo.clearFocus()
         if self._al_terminar:
             self._al_terminar()
 
     def mousePressEvent(self, evento):
+        self._editando = True
         self.activateWindow()
         self.campo.setFocus(Qt.MouseFocusReason)
         evento.accept()

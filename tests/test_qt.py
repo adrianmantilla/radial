@@ -386,6 +386,25 @@ class PruebaBuscador(unittest.TestCase):
         self.menu.hide()
         self.assertFalse(self.buscador.isVisible())
 
+    def test_al_aparecer_no_roba_el_teclado(self):
+        self.menu.show()
+        APP.processEvents()
+        self.buscador.activateWindow()  # aunque el sistema lo active al mostrarlo
+        self.buscador.campo.setFocus(Qt.ActiveWindowFocusReason)
+        APP.processEvents()
+        self.assertFalse(self.buscador.campo.hasFocus())
+        self.assertFalse(self.buscador.lista.isVisible())
+        self.assertTrue(self.terminados)
+        self.assertTrue(self.buscador.testAttribute(Qt.WA_ShowWithoutActivating))
+        self.assertEqual(self.buscador.campo.focusPolicy(), Qt.ClickFocus)
+
+    def test_clic_en_el_campo_si_escribe(self):
+        self.menu.show()
+        APP.processEvents()
+        _clic(self.buscador.campo, QtCore.QPoint(20, 10))
+        APP.processEvents()
+        self.assertTrue(self.buscador._editando)
+
     def test_desactivado_no_se_ve(self):
         self.buscador.activo = False
         self.menu.show()
