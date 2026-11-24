@@ -570,6 +570,30 @@ class PruebaInterfaz(unittest.TestCase):
         self.assertIsNotNone(nueva)
         self.assertEqual(nueva.windowTitle(), "Radial · Settings")
 
+    def test_iconos_de_radial_o_de_maya(self):
+        from radial import iconos
+        self.addCleanup(iconos.usar_iconos, "propios")
+        boton = {"texto": "Extruir", "tipo": "comando", "accion": "PolyExtrude", "icono": ""}
+        self.assertEqual(self.im.ajustes().iconos, "propios")  # por defecto, los del plugin
+        self.assertEqual(iconos.de_boton(boton), "extruir")
+        self.im.mostrar()
+        ventana = self.im.abrir_ajustes()
+        self.assertTrue(ventana.iconos_propios.isChecked())
+        with mock.patch.object(self.im, "_icono_de_comando",
+                               side_effect=lambda c: ":/polyExtrude.png" if c == "PolyExtrude" else ""):
+            iconos.usar_iconos("propios", self.im._icono_de_comando)
+            ventana.iconos_maya.setChecked(True)
+            self.assertEqual(self.im.ajustes().iconos, "maya")
+            self.assertEqual(iconos.de_boton(boton), ":/polyExtrude.png")
+            # Sin icono de Maya, el del plugin; uno elegido a mano no se toca
+            from radial import iconos_acciones
+            self.assertEqual(iconos.de_boton(dict(boton, accion="CenterPivot")),
+                             iconos_acciones.icono_de_comando("CenterPivot"))
+            self.assertEqual(iconos.de_boton(dict(boton, icono="cubo")), "cubo")
+            self.assertTrue(self.im.visible())
+            ventana.iconos_propios.setChecked(True)
+            self.assertEqual(iconos.de_boton(boton), "extruir")
+
     def test_volver_a_centrar(self):
         self.im._al_mover(QtCore.QPoint(10, 10))
         self.im.volver_a_centrar()

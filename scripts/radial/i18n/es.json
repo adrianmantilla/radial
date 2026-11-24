@@ -249,5 +249,8 @@
   "acento_otro": "Otro…",
   "ajustes_idioma": "Idioma",
   "ajustes_aspecto_ayuda": "El acento es el color del botón al pasar por él y de lo elegido en el buscador. El tema y el idioma son tuyos: no cambian los radiales.",
-  "tecla_mayus": "Mayús"
+  "tecla_mayus": "Mayús",
+  "ajustes_iconos": "Iconos",
+  "iconos_propios": "Los de Radial",
+  "iconos_maya": "Los de Maya"
 }

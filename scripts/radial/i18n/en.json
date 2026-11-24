@@ -247,5 +247,10 @@
   "acento_otro": "Other…",
   "ajustes_idioma": "Language",
   "ajustes_aspecto_ayuda": "The accent is the colour of a button when you hover it and of the selected search result. Theme and language are yours: they don't change the radials.",
-  "tecla_mayus": "Shift"
+  "tecla_mayus": "Shift",
+  "ajustes_iconos": "Icons",
+  "iconos_propios": "Radial's own",
+  "iconos_maya": "Maya's",
+  "config_icono_automatico": "Automatic: its action's icon.",
+  "config_filtrar_iconos": "Filter icons (extrude, light, key...)"
 }

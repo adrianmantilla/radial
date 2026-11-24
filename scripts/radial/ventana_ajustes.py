@@ -421,6 +421,18 @@ class VentanaAjustes(QtWidgets.QDialog):
         self.tema_claro.toggled.connect(
             lambda claro: self._aspecto("tema", "claro" if claro else "oscuro"))
 
+        self.iconos_propios = QtWidgets.QRadioButton(t("iconos_propios"))
+        self.iconos_maya = QtWidgets.QRadioButton(t("iconos_maya"))
+        (self.iconos_maya if aspecto.get("iconos") == "maya" else self.iconos_propios).setChecked(True)
+        grupo_iconos = QtWidgets.QButtonGroup(grupo)
+        fila = QtWidgets.QHBoxLayout()
+        for boton in (self.iconos_propios, self.iconos_maya):
+            grupo_iconos.addButton(boton)
+            fila.addWidget(boton)
+        fila.addStretch(1)
+        formulario.addRow(t("ajustes_iconos"), fila)
+        self.iconos_maya.toggled.connect(lambda maya: self._aspecto("iconos", "maya" if maya else "propios"))
+
         self.acento = tema.normalizar_acento(aspecto.get("acento", ""))
         self.muestras = {}
         fila = QtWidgets.QHBoxLayout()

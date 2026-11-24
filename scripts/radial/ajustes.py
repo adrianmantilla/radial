@@ -249,6 +249,18 @@ class Ajustes(object):
         self.datos["acento"] = tema.normalizar_acento(valor)
 
     @property
+    def iconos(self):
+        """Iconos automáticos de los botones: «propios» (los del plugin, por defecto) o «maya»."""
+        from radial import iconos
+        valor = self.datos.get("iconos")
+        return valor if valor in iconos.MODOS else iconos.MODOS[0]
+
+    @iconos.setter
+    def iconos(self, valor):
+        from radial import iconos
+        self.datos["iconos"] = valor if valor in iconos.MODOS else iconos.MODOS[0]
+
+    @property
     def idioma(self):
         """«es», «en»... o "" si no se ha elegido (entonces manda RADIAL_IDIOMA o el español)."""
         valor = self.datos.get("idioma")

@@ -69,11 +69,40 @@ def es_imagen(icono):
     return bool(icono) and (icono.startswith(":") or os.path.isfile(icono))
 
 
+MODOS = ("propios", "maya")
+
+# Qué iconos automáticos se usan: los de línea del plugin («propios», por defecto) o los de Maya a color.
+# ``icono_maya(comando)`` da el icono de Maya de un comando (":/polyExtrude.png") o ""; lo pone el plugin.
+_preferencia = {"modo": "propios", "icono_maya": None}
+
+
+def usar_iconos(modo, icono_maya=None):
+    """Elige los iconos automáticos: «propios» (los del plugin) o «maya» (los de Maya, si los tiene)."""
+    _preferencia["modo"] = modo if modo in MODOS else MODOS[0]
+    if icono_maya is not None:
+        _preferencia["icono_maya"] = icono_maya
+
+
+def modo():
+    return _preferencia["modo"]
+
+
+def _de_maya(boton):
+    buscar = _preferencia["icono_maya"]
+    if _preferencia["modo"] != "maya" or buscar is None or boton.get("tipo") != "comando":
+        return ""
+    try:
+        return buscar((boton.get("accion") or "").strip()) or ""
+    except Exception:  # sin Maya, el icono del plugin
+        return ""
+
+
 def de_boton(boton, categoria=""):
     """El icono que se dibuja en ``boton``: el suyo o, si no tiene, uno del mismo estilo.
 
     Los comandos de Maya sin icono propio usan el de su acción (``"PolyExtrude"``
-    -> ``"extruir"``) o, si no se conoce, el genérico ``"orden"``. Los botones de
+    -> ``"extruir"``) o, si no se conoce, el genérico ``"orden"``. Con ``usar_iconos("maya")``,
+    primero el icono de Maya del comando, si lo tiene. Los botones de
     Python o MEL usan el del comando que llaman, si se reconoce. Devuelve "" si
     no hay icono (entonces se dibuja la inicial del texto).
     """
@@ -84,12 +113,17 @@ def de_boton(boton, categoria=""):
         return icono
     if boton.get("tipo") == "carpeta":
         return "carpeta"
-    icono = iconos_acciones.icono_de_boton(boton, categoria)
+    icono = _de_maya(boton) or iconos_acciones.icono_de_boton(boton, categoria)
     if not icono and boton.get("tipo") == "comando" and (boton.get("accion") or "").strip():
         icono = "orden"
     return icono
 
 
 def de_imagen_maya(boton):
-    """Para botones traídos de un estante: el icono propio que sustituye a su imagen de Maya, o ""."""
+    """Para botones traídos de un estante: el icono propio que sustituye a su imagen de Maya, o "".
+
+    Con los iconos de Maya elegidos, "" (el botón se queda con su imagen del estante).
+    """
+    if _preferencia["modo"] == "maya":
+        return ""
     return iconos_acciones.icono_de_boton(dict(boton, icono=""))

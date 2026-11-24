@@ -243,6 +243,19 @@ def cambiar_aspecto(tema_nuevo=None, acento=None):
         _rehacer_flotantes()
 
 
+def cambiar_iconos(modo):
+    """Iconos automáticos: «propios» (los del plugin) o «maya» (los de Maya a color)."""
+    from radial import iconos
+    ajustes().iconos = modo
+    ajustes().guardar()
+    if iconos.modo() != ajustes().iconos:
+        iconos.usar_iconos(ajustes().iconos, _icono_de_comando)
+        _rehacer_flotantes()
+        configurador = _ventana("configurador")
+        if configurador:
+            configurador.fijar_radial(biblioteca().activo, biblioteca().sin_guardar, _nombre_activo())
+
+
 def cambiar_idioma(idioma):
     """Idioma de la interfaz («es», «en»...). Rehace el menú de Maya y las ventanas."""
     from radial import i18n
@@ -681,7 +694,7 @@ def abrir_ajustes():
 
 def _datos_aspecto():
     from radial import i18n
-    return {"tema": ajustes().tema, "acento": ajustes().acento, "idioma": i18n.idioma(),
+    return {"tema": ajustes().tema, "acento": ajustes().acento, "iconos": ajustes().iconos, "idioma": i18n.idioma(),
             "idiomas": i18n.idiomas()}
 
 
@@ -690,6 +703,8 @@ def _al_aspecto(clave, valor):
         cambiar_aspecto(tema_nuevo=valor)
     elif clave == "acento":
         cambiar_aspecto(acento=valor)
+    elif clave == "iconos":
+        cambiar_iconos(valor)
     elif clave == "idioma":
         cambiar_idioma(valor)
 
@@ -1321,6 +1336,8 @@ def iniciar():
     if ajustes().idioma:
         i18n.usar_idioma(ajustes().idioma)
     tema.aplicar(ajustes().tema, ajustes().acento)
+    from radial import iconos
+    iconos.usar_iconos(ajustes().iconos, _icono_de_comando)
     from radial import acciones
     if _al_usar not in acciones.oyentes:
         acciones.oyentes.append(_al_usar)
