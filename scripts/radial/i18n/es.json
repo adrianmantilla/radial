@@ -18,20 +18,17 @@
   "menu_comprobar": "Comprobar instalación",
   "menu_ayuda": "Cómo se usa",
   "menu_acerca": "Acerca de Radial",
-
   "forma_radial": "Radial",
   "forma_pill": "Pill",
   "forma_pill_horizontal": "Pill horizontal",
   "forma_pill_vertical": "Pill vertical",
   "pill_horizontal": "Horizontal",
   "pill_vertical": "Vertical",
-
   "tipo_comando": "Comando de Maya",
   "tipo_estante": "Botón del estante",
   "tipo_python": "Código Python",
   "tipo_mel": "Código MEL",
   "tipo_vacio": "Vacío",
-
   "boton_aceptar": "Aceptar",
   "boton_cancelar": "Cancelar",
   "boton_cerrar": "Cerrar",
@@ -44,7 +41,6 @@
   "boton_importar": "Importar",
   "boton_exportar": "Exportar",
   "boton_usar_icono": "Usar este icono",
-
   "sin_guardar": "(sin guardar)",
   "nombre_mi_radial": "Mi {nombre}",
   "guardar_como_titulo": "Guardar como nuevo radial",
@@ -56,7 +52,6 @@
   "filtro_radial": "Radial (*.radial)",
   "filtro_radial_maya": "Radial (*.radial)",
   "descartar_pregunta": "«{nombre}» tiene cambios sin guardar. ¿Los descartas?",
-
   "config_titulo": "Radial · Configurar botones",
   "config_cabecera": "Botones del radial «{nombre}»",
   "config_nota_orden": "Arrastra los huecos para cambiar el orden. El 1 va arriba y los demás siguen el sentido del reloj.",
@@ -81,7 +76,6 @@
   "config_estado_comando": "Ejecuta el comando de Maya {comando}.",
   "config_estado_sin_comando": "Elige un comando de la lista.",
   "config_estado_codigo": "Usa «Probar este botón» para comprobar que el código funciona.",
-
   "ajustes_titulo": "Radial · Ajustes",
   "ajustes_ayuda": "Los cambios se ven al momento en el menú. El tamaño y la opacidad se guardan con el radial activo.",
   "ajustes_forma": "Forma",
@@ -93,7 +87,6 @@
   "ajustes_opacidad": "Opacidad",
   "ajustes_velocidad": "Velocidad del doble Tab",
   "ajustes_velocidad_ayuda": "Tiempo máximo entre los dos Tab. Si te cuesta abrir el menú, súbelo; si se abre sin querer, bájalo.",
-
   "gestor_titulo": "Radial · Mis radiales",
   "gestor_usar": "Usar",
   "gestor_renombrar": "Renombrar...",
@@ -107,7 +100,6 @@
   "gestor_borrar_pregunta": "¿Borrar el radial «{nombre}»? No se puede deshacer.",
   "gestor_descartar": "El radial activo tiene cambios sin guardar. ¿Los descartas?",
   "gestor_error": "No se pudo hacer: {error}",
-
   "comando_anotacion": "Radial: muestra u oculta el menú",
   "comando_configurar_anotacion": "Radial: abre el configurador de botones",
   "iniciado": "Radial {version} listo: pulsa Tab dos veces rápido sobre un visor para mostrar u ocultar el menú.",
@@ -115,7 +107,6 @@
   "radial_no_valido": "Radial: no se pudo leer {ruta} ({error}).",
   "accion_no_existe": "Radial: el botón «{nombre}» usa el comando {comando}, que no existe en esta versión de Maya.",
   "accion_error": "Radial: el botón «{nombre}» falló: {error}. Detalles en el Script Editor.",
-
   "comprobar_titulo": "Comprobar instalación",
   "comprobar_ok": "Todo correcto.",
   "comprobar_avisos": "Hay avisos, revisa la lista.",
@@ -128,9 +119,14 @@
   "comprobar_radial": "Radial activo: {nombre} (forma {forma})",
   "comprobar_boton_aviso": "Botón {numero}: el comando {comando} no existe en esta versión de Maya.",
   "comprobar_carpeta": "Tus radiales: {ruta} ({n})",
-
   "ayuda_texto": "Mostrar u ocultar: pon el ratón sobre un visor y pulsa Tab dos veces rápido.\n\nUsar un botón: acerca el ratón a un punto y haz clic. El menú sigue a la vista hasta el siguiente doble Tab.\n\nMover: arrastra desde el centro (o desde los puntitos de la pill). Recuerda dónde lo dejas.\n\nCambiar los botones: clic derecho en el centro, o Radial > Configurar botones.\n\nTamaño, forma y velocidad: Radial > Ajustes.\n\nGuardar y compartir: Radial > Radiales. Exporta un archivo .radial y tus alumnos lo cargan con «Importar desde archivo».",
   "acerca_texto": "Radial {version}\n\nMenú radial de seis botones para Maya 2026 y 2027.\nLicencia MIT.",
   "instalado_titulo": "Radial instalado",
-  "instalado_texto": "Radial {version} está instalado y se cargará cada vez que abras Maya.\n\nPon el ratón sobre un visor y pulsa Tab dos veces rápido para ver el menú."
+  "instalado_texto": "Radial {version} está instalado y se cargará cada vez que abras Maya.\n\nPon el ratón sobre un visor y pulsa Tab dos veces rápido para ver el menú.",
+  "buscador_pista": "Buscar acción…",
+  "buscador_nada": "Ninguna orden coincide con «{texto}».",
+  "buscador_recientes": "Usadas hace poco",
+  "buscador_asignado": "Radial: «{texto}» está ahora en el botón {numero}. Guarda el radial para conservarlo.",
+  "ajustes_buscador": "Buscador",
+  "ajustes_buscador_casilla": "Mostrar el buscador de acciones bajo el menú"
 }

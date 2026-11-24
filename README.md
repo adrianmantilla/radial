@@ -9,6 +9,7 @@ Cada botón lanza la orden de Maya que tú elijas.
 - Dos formas a juego: **radial** (seis puntos en un anillo) y **pill** (una cápsula, horizontal o vertical).
 - Cada botón puede ser un comando de Maya, un botón de cualquier estante, código Python o código MEL.
 - Cuatro radiales preconfigurados (Modelado, UV y texturas, Animación y Render con Arnold) y los tuyos propios.
+- Buscador de acciones debajo del menú: escribe y lanza cualquier orden de Maya o de tus estantes.
 - Se guarda, se exporta y se comparte como un archivo `.radial`.
 - No cambia ningún atajo de Maya.
 
@@ -39,6 +40,8 @@ Tus radiales y ajustes se conservan.
 | Mostrar u ocultar el menú | Tab dos veces rápido con el ratón sobre un visor 3D, o **Radial > Mostrar/ocultar menú** |
 | Usar un botón | Acerca el ratón: el botón se vuelve blanco y aparece su nombre. Haz clic |
 | Mover el menú | Arrástralo desde el centro (en la pill, desde los puntitos del extremo). Recuerda dónde lo dejas |
+| Buscar y lanzar cualquier orden | Clic en el buscador de debajo del menú, escribe y elige (↑ ↓ e Intro, o clic). Esc devuelve el teclado a Maya |
+| Poner una orden en un botón | Arrastra un resultado del buscador hasta un punto del menú |
 | Cambiar los botones | Clic derecho en el centro, o **Radial > Configurar botones** |
 | Cambiar de radial | **Radial > Radiales** |
 | Radial o pill | **Radial > Forma**, o en **Radial > Ajustes** |
@@ -57,6 +60,18 @@ Fuera de los botones, la línea y el centro, los clics pasan a Maya, así que pu
 - No cuenta mientras escribes en un campo de texto, el Script Editor o la Caja de canales.
 - Con el menú oculto solo cuenta sobre un visor 3D, así que el Tab del Editor de nodos y del
   Hypershade (abrir el buscador de nodos) funciona igual que siempre.
+
+## Buscador de acciones
+
+Debajo del radial y de la pill hay una barra **Buscar acción…**. Haz clic en ella y escribe: salen las
+órdenes de Maya (las del Editor de atajos) y los botones de tus estantes que coinciden, con su menú y el
+nombre del comando. Las palabras pueden ir en cualquier orden («uv editor» o «editor uv») y no importan
+las tildes ni las mayúsculas. Antes de escribir enseña las últimas que has usado.
+
+- **↑ ↓** para elegir, **Intro** o clic para ejecutar. **Esc** borra y devuelve el teclado a Maya.
+- Mientras escribes, Maya no recibe tus teclas, así que no se dispara ningún atajo.
+- **Arrastra un resultado hasta un botón** del menú para ponerlo en ese botón (luego guarda el radial).
+- Se oculta en **Radial > Ajustes > Buscador**.
 
 ## Configurar los botones
 
@@ -133,6 +148,9 @@ scripts/radial/
   filtro_teclado.py          escucha el teclado de Maya
   menu_radial.py             el menú en forma de anillo de puntos
   menu_pill.py               el menú en forma de pill
+  buscador.py                barra de búsqueda y desplegable bajo el menú
+  busqueda.py                buscar acciones y recientes (sin Maya)
+  arrastre.py                soltar una acción en un botón del menú
   dibujo.py                  colores e iconos compartidos
   configurador.py            ventana para configurar los botones
   ventana_ajustes.py         ventana de ajustes

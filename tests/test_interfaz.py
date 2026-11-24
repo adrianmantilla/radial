@@ -25,7 +25,7 @@ if QtWidgets is not None:
     # Se cargan antes de poner el Maya falso: al quitarlo, mock.patch.dict borra de
     # sys.modules lo importado mientras tanto, y borrar módulos de Qt rompe Python.
     for _modulo in ("biblioteca", "configurador", "filtro_teclado", "gestor_radiales",
-                    "menu_pill", "menu_radial", "qt", "ventana_ajustes"):
+                    "menu_pill", "menu_radial", "qt", "ventana_ajustes", "buscador", "busqueda", "arrastre"):
         importlib.import_module("radial." + _modulo)
 
 
@@ -158,6 +158,28 @@ class PruebaInterfaz(unittest.TestCase):
     def test_ejecutar_boton(self):
         self.im._al_ejecutar(1)
         sys.modules["maya.mel"].eval.assert_called_with("CenterPivot")
+
+    def test_buscador_bajo_el_menu(self):
+        self.im.mostrar()
+        QtWidgets.QApplication.processEvents()
+        buscador = self.im._estado["buscador"]
+        self.assertTrue(buscador.isVisible())
+        self.im.cambiar_buscador(False)
+        self.assertFalse(buscador.isVisible())
+        self.assertFalse(self.im.ajustes().buscador)
+        self.im.cambiar_forma("pill", False)
+        self.assertIs(self.im._estado["buscador"]._menu, self.im._menu_flotante(crear=False))
+
+    def test_ejecutar_desde_el_buscador_guarda_reciente(self):
+        from radial import busqueda
+        self.im._al_buscar(busqueda.accion_de_comando("FreezeTransformations"))
+        sys.modules["maya.mel"].eval.assert_called_with("FreezeTransformations")
+        self.assertEqual(self.im.ajustes().recientes[0]["nombre"], "FreezeTransformations")
+
+    def test_soltar_asigna_el_boton(self):
+        self.im._al_soltar(3, {"texto": "Extrude", "tipo": "comando", "accion": "PolyExtrude"})
+        self.assertEqual(self.im.radial_activo()["botones"][3]["accion"], "PolyExtrude")
+        self.assertTrue(self.im.biblioteca().sin_guardar)
 
     def test_volver_a_centrar(self):
         self.im._al_mover(QtCore.QPoint(10, 10))

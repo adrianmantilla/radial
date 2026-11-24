@@ -20,7 +20,7 @@ COMANDO_ALTERNAR = "RadialMostrarOcultar"
 COMANDO_CONFIGURAR = "RadialConfigurar"
 
 _estado = {"menu": None, "filtro": None, "ajustes": None, "biblioteca": None,
-           "configurador": None, "ventana_ajustes": None, "gestor": None}
+           "configurador": None, "ventana_ajustes": None, "gestor": None, "buscador": None}
 
 
 # --- Ajustes y biblioteca -------------------------------------------------------
@@ -192,12 +192,19 @@ def _menu_flotante(crear=True):
             menu = MenuRadial(ventana_maya(), al_ejecutar=_al_ejecutar, al_mover=_al_mover,
                               al_configurar=abrir_configurador)
         menu.usar_radial(radial_activo())
+        menu.al_soltar = _al_soltar
         _estado["menu"] = menu
+        buscador = _buscador()
+        buscador.activo = ajustes().buscador
+        buscador.acompanar(menu)
     return menu
 
 
 def _destruir_menu_flotante():
     menu = _estado["menu"]
+    buscador = _estado.get("buscador")
+    if sigue_vivo(buscador):
+        buscador.acompanar(None)
     if sigue_vivo(menu):
         menu.hide()
         if getattr(menu, "etiqueta", None) is not None:
@@ -275,6 +282,69 @@ def _al_ejecutar(indice):
     acciones.ejecutar(radial_activo()["botones"][indice])
 
 
+def _al_soltar(indice, boton):
+    """Se soltó una acción del buscador encima de un botón: pasa a ser ese botón."""
+    radial = radial_activo()
+    radial["botones"][indice] = rd.normalizar_boton(boton)
+    modificar_radial(radial)
+    print(t("buscador_asignado", texto=radial["botones"][indice]["texto"], numero=indice + 1))
+
+
+# --- Buscador -------------------------------------------------------------------
+
+def _buscador():
+    buscador = _estado.get("buscador")
+    if not sigue_vivo(buscador):
+        from radial.buscador import Buscador
+        buscador = Buscador(_acciones_buscador, _al_buscar, recientes=lambda: ajustes().recientes,
+                            al_terminar=_devolver_foco, padre=ventana_maya())
+        _estado["buscador"] = buscador
+    return buscador
+
+
+def _acciones_buscador():
+    from radial import busqueda
+    from radial.fuentes_maya import FuentesMaya
+    fuentes = FuentesMaya()
+    acciones = [busqueda.accion_de_comando(*c) for c in fuentes.comandos()]
+    for estante, botones in fuentes.estantes():
+        acciones.extend(busqueda.accion_de_estante(estante, b) for b in botones)
+    return acciones
+
+
+def _al_buscar(accion):
+    from radial import acciones, busqueda
+    ajustes().recientes = busqueda.anadir_reciente(ajustes().recientes, accion)
+    ajustes().guardar()
+    acciones.ejecutar(accion["boton"])
+
+
+def _devolver_foco():
+    principal = ventana_maya()
+    if principal is not None:
+        principal.activateWindow()
+
+
+def cambiar_buscador(activo):
+    """Muestra u oculta el buscador bajo el menú."""
+    ajustes().buscador = bool(activo)
+    ajustes().guardar()
+    buscador = _estado.get("buscador")
+    if sigue_vivo(buscador):
+        buscador.activo = bool(activo)
+        buscador.actualizar()
+
+
+def _destruir_buscador():
+    buscador = _estado.get("buscador")
+    if sigue_vivo(buscador):
+        buscador.acompanar(None)
+        buscador.hide()
+        destruir(buscador.lista)
+        destruir(buscador)
+    _estado["buscador"] = None
+
+
 def _al_mover(centro):
     ajustes().posicion = (centro.x(), centro.y())
     ajustes().guardar()
@@ -321,7 +391,8 @@ def abrir_ajustes():
     from radial.ventana_ajustes import VentanaAjustes
     ventana = VentanaAjustes(radial_activo()["apariencia"], ajustes().forma, ajustes().pill_vertical,
                              ajustes().ventana_ms, al_apariencia=_apariencia_cambiada,
-                             al_forma=cambiar_forma, al_velocidad=_velocidad_cambiada, padre=ventana_maya())
+                             al_forma=cambiar_forma, al_velocidad=_velocidad_cambiada, padre=ventana_maya(),
+                             buscador=ajustes().buscador, al_buscador=cambiar_buscador)
     _estado["ventana_ajustes"] = ventana
     if not visible():
         mostrar()
@@ -573,6 +644,7 @@ def detener():
     _quitar_filtro()
     _cerrar_ventanas()
     _destruir_menu_flotante()
+    _destruir_buscador()
     _estado.update(ajustes=None, biblioteca=None)
     if not cmds.about(batch=True):
         quitar_menu()

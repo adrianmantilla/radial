@@ -23,6 +23,8 @@ if QtWidgets is not None:
     from radial.menu_pill import MenuPill
     from radial.configurador import Configurador
     from radial.ventana_ajustes import VentanaAjustes
+    from radial.buscador import Buscador
+    from radial import arrastre, busqueda
 
     Qt = QtCore.Qt
     QEvent = QtCore.QEvent
@@ -350,6 +352,125 @@ class PruebaConfigurador(unittest.TestCase):
     def test_guardar(self):
         self.ventana.boton_guardar.click()
         self.assertEqual(self.guardados, [1])
+
+
+@unittest.skipIf(QtWidgets is None, "PySide6 no está instalado")
+class PruebaBuscador(unittest.TestCase):
+    def setUp(self):
+        self.ejecutadas, self.terminados, self.recientes = [], [], []
+        acciones = [busqueda.accion_de_comando(*c) for c in FuentesFalsas().comandos()]
+        self.buscador = Buscador(lambda: acciones, self.ejecutadas.append, recientes=lambda: self.recientes,
+                                 al_terminar=lambda: self.terminados.append(1))
+        self.menu = MenuRadial()
+        self.menu.usar_radial(rd.por_defecto())
+        self.menu.colocar(QtCore.QPoint(500, 400))
+        self.buscador.acompanar(self.menu)
+        self.addCleanup(self.buscador.close)
+        self.addCleanup(self.menu.close)
+
+    def _escribir(self, texto):
+        self.buscador.campo.setText(texto)
+        self.buscador.campo.textEdited.emit(texto)
+
+    def _tecla(self, tecla):
+        evento = QtGui.QKeyEvent(QEvent.KeyPress, tecla, Qt.NoModifier)
+        APP.sendEvent(self.buscador.campo, evento)
+
+    def test_sigue_al_menu(self):
+        self.assertFalse(self.buscador.isVisible())
+        self.menu.show()
+        APP.processEvents()
+        self.assertTrue(self.buscador.isVisible())
+        self.assertGreater(self.buscador.y(), self.menu.y() + self.menu.height() - 1)
+        self.assertEqual(self.buscador.geometry().center().x() // 4, self.menu.geometry().center().x() // 4)
+        self.menu.hide()
+        self.assertFalse(self.buscador.isVisible())
+
+    def test_desactivado_no_se_ve(self):
+        self.buscador.activo = False
+        self.menu.show()
+        APP.processEvents()
+        self.assertFalse(self.buscador.isVisible())
+
+    def test_ancho_de_la_pill(self):
+        pill = MenuPill()
+        pill.usar_radial(rd.por_defecto())
+        self.addCleanup(pill.close)
+        self.buscador.acompanar(pill)
+        pill.show()
+        APP.processEvents()
+        self.assertEqual(self.buscador.width(), max(200, pill.width()))
+
+    def test_escribir_y_ejecutar_con_intro(self):
+        self.menu.show()
+        self._escribir("extr")
+        self.assertTrue(self.buscador.lista.isVisible())
+        self.assertEqual(self.buscador.lista.acciones[0]["nombre"], "PolyExtrude")
+        self._tecla(Qt.Key_Return)
+        self.assertEqual(self.ejecutadas[0]["nombre"], "PolyExtrude")
+        self.assertEqual(self.buscador.campo.text(), "")
+        self.assertFalse(self.buscador.lista.isVisible())
+        self.assertEqual(self.terminados, [1])
+
+    def test_flechas_y_esc(self):
+        self._escribir("e")
+        primera = self.buscador.lista.accion_elegida()
+        self._tecla(Qt.Key_Down)
+        self.assertIsNot(self.buscador.lista.accion_elegida(), primera)
+        self._tecla(Qt.Key_Escape)
+        self.assertEqual(self.ejecutadas, [])
+        self.assertEqual(self.buscador.campo.text(), "")
+        self.assertEqual(self.terminados, [1])
+
+    def test_sin_resultados_y_recientes(self):
+        self._escribir("zzz")
+        self.assertEqual(self.buscador.lista.acciones, [])
+        self.recientes.append(busqueda.accion_de_comando("CenterPivot"))
+        self._escribir("")
+        self.assertEqual(self.buscador.lista.titulo, "Usadas hace poco")
+
+    def test_clic_en_resultado(self):
+        self._escribir("pivot")
+        lista = self.buscador.lista
+        _clic(lista, QtCore.QPoint(50, 5 + 19))
+        self.assertEqual(self.ejecutadas[0]["nombre"], "CenterPivot")
+
+    def test_dibuja(self):
+        self._escribir("e")
+        self.buscador.lista.grab()
+        self.buscador.grab()
+
+    def test_una_lista_rota_no_rompe(self):
+        buscador = Buscador(lambda: 1 / 0, self.ejecutadas.append)
+        self.addCleanup(buscador.close)
+        buscador.campo.textEdited.emit("x")
+        self.assertEqual(buscador.lista.acciones, [])
+
+
+@unittest.skipIf(QtWidgets is None, "PySide6 no está instalado")
+class PruebaSoltar(unittest.TestCase):
+    def test_soltar_en_un_boton(self):
+        soltados = []
+        menu = MenuRadial()
+        menu.usar_radial(rd.por_defecto())
+        menu.al_soltar = lambda i, b: soltados.append((i, b))
+        self.addCleanup(menu.close)
+        boton = {"texto": "Extrude", "tipo": "comando", "accion": "PolyExtrude"}
+        x, y = rd.posiciones(menu.apariencia["radio"])[2]
+        punto = QtCore.QPointF(menu.width() / 2 + x, menu.height() / 2 + y)
+        datos = arrastre.datos_mime(boton)
+        for tipo in (QEvent.DragEnter, QEvent.DragMove):
+            evento = QtGui.QDragMoveEvent(punto.toPoint(), Qt.CopyAction, datos, Qt.LeftButton, Qt.NoModifier,
+                                          tipo)
+            APP.sendEvent(menu, evento)
+        self.assertEqual(menu._sobre, 2)
+        APP.sendEvent(menu, QtGui.QDropEvent(punto, Qt.CopyAction, datos, Qt.LeftButton, Qt.NoModifier))
+        self.assertEqual(soltados, [(2, boton)])
+
+    def test_mime_raro_no_se_acepta(self):
+        datos = QtCore.QMimeData()
+        datos.setText("hola")
+        self.assertIsNone(arrastre.boton_de(datos))
 
 
 @unittest.skipIf(QtWidgets is None, "PySide6 no está instalado")

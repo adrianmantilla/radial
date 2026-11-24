@@ -11,6 +11,7 @@ from radial import radiales as rd
 from radial.dibujo import (COLOR_ABIERTO, COLOR_AGARRE, COLOR_AGARRE_SOBRE, COLOR_BORDE_FONDO,
                            COLOR_DETALLE, COLOR_FONDO, COLOR_ICONO_CLARO, COLOR_LINEA, COLOR_TEXTO,
                            mezclar, pixmap_icono)
+from radial.arrastre import SoltarBoton
 from radial.qt import QtCore, QtGui, QtWidgets, posicion_global, posicion_local
 
 Qt = QtCore.Qt
@@ -70,11 +71,12 @@ class EtiquetaPill(QtWidgets.QWidget):
         pintor.end()
 
 
-class MenuPill(QtWidgets.QWidget):
+class MenuPill(SoltarBoton, QtWidgets.QWidget):
     def __init__(self, padre=None, al_ejecutar=None, al_mover=None, al_configurar=None, vertical=False):
         super(MenuPill, self).__init__(padre)
         _ventana_flotante(self)
         self.setMouseTracking(True)
+        self.setAcceptDrops(True)
         self.setObjectName("RadialPill")
         self.setWindowTitle("Radial")
 
@@ -228,7 +230,7 @@ class MenuPill(QtWidgets.QWidget):
         quietos = True
         for i in range(rd.NUM_BOTONES):
             vacio = self.radial["botones"][i]["tipo"] == "vacio"
-            objetivo = 1.0 if (self._sobre == i and not vacio) else 0.0
+            objetivo = 1.0 if (self._sobre == i and (not vacio or self._soltando)) else 0.0
             actual = self._apertura[i]
             if abs(objetivo - actual) > 1e-3:
                 paso = _PASO_ANIMACION if objetivo > actual else -_PASO_ANIMACION

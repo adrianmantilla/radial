@@ -21,6 +21,10 @@ Si no se abre, prueba a pulsar más rápido. También puedes usar **Radial > Mos
 - Haz clic para ejecutarlo. El menú se queda abierto, así puedes usar varios botones seguidos.
 - Para moverlo, arrástralo desde el **centro** (los seis puntitos). Se queda donde lo sueltes.
 
+Debajo del menú tienes el **buscador**: haz clic, escribe lo que buscas (por ejemplo «extrude») y elige
+con las flechas e Intro o con un clic. **Esc** para salir. Si arrastras un resultado hasta un punto del
+menú, ese botón pasa a hacer esa orden.
+
 ## 4. Elegir otro juego de botones
 
 **Radial > Radiales** y elige uno: Modelado, UV y texturas, Animación o Render con Arnold.

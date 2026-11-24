@@ -111,3 +111,24 @@ class Ajustes(object):
     @sin_guardar.setter
     def sin_guardar(self, valor):
         self.datos["sin_guardar"] = bool(valor)
+
+    # Buscador de acciones bajo el menú
+    @property
+    def buscador(self):
+        return self.datos.get("buscador") is not False
+
+    @buscador.setter
+    def buscador(self, valor):
+        self.datos["buscador"] = bool(valor)
+
+    @property
+    def recientes(self):
+        valor = self.datos.get("recientes")
+        if not isinstance(valor, list):
+            return []
+        return [a for a in valor if isinstance(a, dict) and isinstance(a.get("boton"), dict)
+                and isinstance(a.get("texto"), str)]
+
+    @recientes.setter
+    def recientes(self, valor):
+        self.datos["recientes"] = list(valor)

@@ -39,6 +39,9 @@ TRAZOS = {
     "lapiz": "M4 20l1-5L16 4l4 4L9 19z M14 6l4 4",
     "carpeta": "M3 6h6l2 2h10v11H3z",
     "papelera": "M4 7h16 M9 7V4h6v3 M6 7l1 13h10l1-13",
+    "rayo": "M13 3L5 13.5h6L10 21l8-10.5h-6z",
+    "estante": "M3 19h18 M5 19V6h4v13 M10 19V9h4v10 M15 19l2.5-11 3.5.8-2.3 10.2",
+    "lupa": "M4.5 10.5a6 6 0 1 0 12 0a6 6 0 1 0 -12 0 M15 15l5 5",
 }
 
 _SVG = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" '

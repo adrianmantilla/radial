@@ -63,10 +63,11 @@ class Deslizador(QtWidgets.QWidget):
 
 
 class VentanaAjustes(QtWidgets.QDialog):
-    """Avisa con ``al_apariencia(dict)``, ``al_forma(forma, vertical)`` y ``al_velocidad(ms)``."""
+    """Avisa con ``al_apariencia(dict)``, ``al_forma(forma, vertical)``, ``al_velocidad(ms)``
+    y ``al_buscador(bool)``."""
 
     def __init__(self, apariencia, forma, vertical, ventana_ms, al_apariencia=None, al_forma=None,
-                 al_velocidad=None, padre=None):
+                 al_velocidad=None, padre=None, buscador=True, al_buscador=None):
         super(VentanaAjustes, self).__init__(padre)
         self.setWindowTitle(t("ajustes_titulo"))
         self.setObjectName("RadialAjustes")
@@ -74,6 +75,7 @@ class VentanaAjustes(QtWidgets.QDialog):
         self._al_apariencia = al_apariencia
         self._al_forma = al_forma
         self._al_velocidad = al_velocidad
+        self._al_buscador = al_buscador
         self.apariencia = rd.normalizar_apariencia(apariencia)
 
         capa = QtWidgets.QVBoxLayout(self)
@@ -126,6 +128,11 @@ class VentanaAjustes(QtWidgets.QDialog):
         nota.setWordWrap(True)
         nota.setEnabled(False)
         formulario.addRow("", nota)
+
+        self.buscador = QtWidgets.QCheckBox(t("ajustes_buscador_casilla"))
+        self.buscador.setChecked(bool(buscador))
+        self.buscador.toggled.connect(lambda valor: self._al_buscador and self._al_buscador(bool(valor)))
+        formulario.addRow(t("ajustes_buscador"), self.buscador)
 
         pie = QtWidgets.QHBoxLayout()
         restaurar = QtWidgets.QPushButton(t("boton_restaurar_valores"))

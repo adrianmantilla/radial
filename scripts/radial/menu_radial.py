@@ -14,6 +14,7 @@ from radial import radiales as rd
 from radial.dibujo import (COLOR_ABIERTO, COLOR_AGARRE, COLOR_AGARRE_SOBRE, COLOR_BORDE, COLOR_CENTRO,
                            COLOR_DETALLE, COLOR_LINEA, COLOR_PUNTO, COLOR_TEXTO, dibujar_icono_boton,
                            dibujar_texto, mezclar)
+from radial.arrastre import SoltarBoton
 from radial.qt import QtCore, QtGui, QtWidgets, posicion_global, posicion_local
 
 Qt = QtCore.Qt
@@ -21,7 +22,7 @@ Qt = QtCore.Qt
 _PASO_ANIMACION = 0.22
 
 
-class MenuRadial(QtWidgets.QWidget):
+class MenuRadial(SoltarBoton, QtWidgets.QWidget):
     """Menú radial. Avisa con tres funciones que le pasa quien lo crea:
 
     - ``al_ejecutar(indice)``: clic en un botón.
@@ -37,6 +38,7 @@ class MenuRadial(QtWidgets.QWidget):
         self.setAttribute(Qt.WA_ShowWithoutActivating)
         self.setFocusPolicy(Qt.NoFocus)
         self.setMouseTracking(True)
+        self.setAcceptDrops(True)
         self.setObjectName("RadialMenu")
         self.setWindowTitle("Radial")
 
@@ -86,6 +88,9 @@ class MenuRadial(QtWidgets.QWidget):
     def _local(self, punto):
         """Pasa un punto de la ventana a coordenadas con origen en el centro."""
         return punto.x() - self.width() / 2.0, punto.y() - self.height() / 2.0
+
+    def _que_hay(self, punto):
+        return rd.que_hay_en(*self._local(punto), apariencia=self.apariencia)
 
     # --- Máscara: solo los puntos, la línea, el centro y el texto reciben clics
 
@@ -174,7 +179,7 @@ class MenuRadial(QtWidgets.QWidget):
         quietos = True
         for i in range(rd.NUM_BOTONES):
             vacio = self.radial["botones"][i]["tipo"] == "vacio"
-            objetivo = 1.0 if (self._sobre == i and not vacio) else 0.0
+            objetivo = 1.0 if (self._sobre == i and (not vacio or self._soltando)) else 0.0
             actual = self._apertura[i]
             if abs(objetivo - actual) > 1e-3:
                 paso = _PASO_ANIMACION if objetivo > actual else -_PASO_ANIMACION
