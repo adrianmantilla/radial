@@ -536,6 +536,48 @@ def cambiar_atajo(texto):
     return ""
 
 
+def _ejecutar_dialogo(dialogo):
+    """Abre ``dialogo`` y espera (aparte para poder probarlo sin ventana)."""
+    return dialogo.exec_() if hasattr(dialogo, "exec_") else dialogo.exec()
+
+
+def _titulo_hueco(i, boton):
+    return "{} · {}".format(i + 1, boton["texto"] or t("config_hueco_vacio"))
+
+
+def crear_boton_de_lo_ultimo():
+    """Crea un botón con las últimas órdenes del Script Editor, sin escribir código."""
+    from radial import grabar, pill_extra
+    lineas = grabar.ordenes(grabar.registro_maya())
+    if not lineas:
+        cmds.confirmDialog(title=t("grabar_titulo"), message=t("grabar_vacio"), button=[t("boton_aceptar")])
+        return False
+    destinos = [("menu", t("grabar_menu_principal", nombre=_nombre_activo()))]
+    huecos = {"menu": [(i, _titulo_hueco(i, b)) for i, b in enumerate(radial_activo()["botones"])]}
+    if pill_extra.ajustes().activa:
+        destinos.append(("extra", t("grabar_menu_extra", nombre=pill_extra.nombre())))
+        huecos["extra"] = [(i, _titulo_hueco(i, b)) for i, b in enumerate(pill_extra.biblioteca().activo["botones"])]
+    dialogo = grabar.dialogo(lineas, huecos, destinos, padre=ventana_maya())
+    vacios = [i for i, b in enumerate(radial_activo()["botones"]) if b["tipo"] == "vacio"]
+    if vacios:
+        dialogo.hueco.setCurrentIndex(dialogo.hueco.findData(vacios[0]))
+    if not _ejecutar_dialogo(dialogo):
+        return False
+    boton, destino, indice = dialogo.resultado()
+    if boton is None or indice is None:
+        return False
+    extra = destino == "extra"
+    radial = pill_extra.biblioteca().activo if extra else radial_activo()
+    if radial.get("bloqueado"):
+        cmds.warning(t("radial_bloqueado_aviso", nombre=pill_extra.nombre() if extra else _nombre_activo()))
+        return False
+    radial = dict(radial, botones=list(radial["botones"]))
+    radial["botones"][indice] = rd.normalizar_boton(boton)
+    (pill_extra.modificar if extra else modificar_radial)(radial)
+    print(t("buscador_asignado", texto=boton["texto"], numero=indice + 1))
+    return True
+
+
 def _datos_extra():
     from radial import pill_extra
     return {"activa": pill_extra.ajustes().activa, "vertical": pill_extra.ajustes().vertical,
@@ -992,6 +1034,7 @@ def crear_menu():
     cmds.menu(MENU, parent="MayaWindow", label=t("menu_titulo"), tearOff=True)
     cmds.menuItem(label=t("menu_alternar"), command=lambda *_: alternar())
     cmds.menuItem(label=t("menu_configurar"), command=lambda *_: abrir_configurador())
+    cmds.menuItem(label=t("menu_grabar"), command=lambda *_: crear_boton_de_lo_ultimo())
     cmds.menuItem(MENU_RADIALES, label=t("menu_radiales"), subMenu=True, tearOff=True,
                   postMenuCommand=_llenar_radiales)
     cmds.setParent("..", menu=True)

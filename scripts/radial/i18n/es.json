@@ -193,5 +193,15 @@
   "atajo_ocupado": "Ese atajo ya lo usa Maya para «{comando}». Elige otro.",
   "atajo_no_valido": "Ese atajo no vale: usa Ctrl, Alt o Cmd más una tecla.",
   "atajo_asignado": "Radial: el atajo {atajo} muestra u oculta el menú.",
-  "atajo_quitado": "Radial: atajo quitado."
+  "atajo_quitado": "Radial: atajo quitado.",
+  "grabar_titulo": "Radial · Botón con lo último que hice",
+  "grabar_ayuda": "Estas son las últimas órdenes que Maya ha escrito en el Script Editor (la más reciente abajo). Marca las que quieras guardar: el botón las repetirá en ese orden y se deshacen de una vez con Ctrl+Z.",
+  "grabar_nombre_pista": "Nombre del botón (si lo dejas vacío, el de la última orden)",
+  "grabar_menu": "Menú",
+  "grabar_hueco": "Hueco",
+  "grabar_crear": "Crear botón",
+  "grabar_menu_principal": "Menú del doble Tab ({nombre})",
+  "grabar_menu_extra": "Pill extra ({nombre})",
+  "grabar_vacio": "Todavía no hay órdenes que guardar. Abre el Script Editor (Windows › General Editors › Script Editor), haz lo que quieras repetir y vuelve aquí. Si no salen órdenes, activa History › Echo All Commands en el Script Editor.",
+  "menu_grabar": "Crear botón con lo último que hice..."
 }

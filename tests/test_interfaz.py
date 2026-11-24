@@ -370,6 +370,41 @@ class PruebaInterfaz(unittest.TestCase):
         self.assertEqual(self.im.cambiar_atajo(""), "")
         self.assertEqual(self.im.ajustes().atajo, "")
 
+    def test_boton_con_lo_ultimo_que_hice(self):
+        from radial import grabar
+        registro = "polyExtrudeFacet -ltz 0.5 pCube1.f[1];\npolyBevel3 -fraction 0.2 pCube1.e[4];\n"
+        vistos = []
+
+        def aceptar(dialogo):
+            vistos.append(dialogo)
+            self.assertEqual(dialogo.elegidas(), ["polyBevel3 -fraction 0.2 pCube1.e[4];"])
+            dialogo.lista.item(0).setCheckState(QtCore.Qt.Checked)
+            dialogo.nombre.setText("Extruir y biselar")
+            return True
+
+        vacios = [i for i, b in enumerate(self.im.radial_activo()["botones"]) if b["tipo"] == "vacio"]
+        if not vacios:
+            radial = self.im.radial_activo()
+            radial["botones"][5] = {"tipo": "vacio"}
+            self.im.modificar_radial(radial)
+            vacios = [5]
+        with mock.patch.object(grabar, "registro_maya", return_value=registro), \
+                mock.patch.object(self.im, "_ejecutar_dialogo", side_effect=aceptar):
+            self.assertTrue(self.im.crear_boton_de_lo_ultimo())
+        self.assertEqual(vistos[0].hueco.currentData(), vacios[0])  # el primer hueco libre
+        boton = self.im.radial_activo()["botones"][vacios[0]]
+        self.assertEqual(boton["texto"], "Extruir y biselar")
+        self.assertEqual(boton["accion"].splitlines(), registro.splitlines())
+        self.assertTrue(self.im.biblioteca().sin_guardar)
+
+    def test_boton_con_lo_ultimo_sin_ordenes(self):
+        from radial import grabar
+        with mock.patch.object(grabar, "registro_maya", return_value="// nada //"), \
+                mock.patch.object(self.im, "_ejecutar_dialogo") as ejecutar:
+            self.assertFalse(self.im.crear_boton_de_lo_ultimo())
+        ejecutar.assert_not_called()
+        self.assertTrue(self.cmds.confirmDialog.called)
+
     def test_volver_a_centrar(self):
         self.im._al_mover(QtCore.QPoint(10, 10))
         self.im.volver_a_centrar()

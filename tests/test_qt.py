@@ -6,6 +6,7 @@ Necesitan PySide6 (``pip install PySide6-Essentials``); si no está, se saltan.
 import os
 import sys
 import unittest
+import unittest.mock
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(RAIZ, "scripts"))
@@ -541,6 +542,30 @@ class PruebaSoltar(unittest.TestCase):
         datos = QtCore.QMimeData()
         datos.setText("hola")
         self.assertIsNone(arrastre.boton_de(datos))
+
+    def test_codigo_de_un_estante(self):
+        mel = QtCore.QMimeData()
+        mel.setText("polyCube -w 2;")
+        self.assertEqual(arrastre.boton_de(mel)["tipo"], "mel")
+        self.assertEqual(arrastre.boton_de(mel)["texto"], "polyCube")
+        maya = QtCore.QMimeData()
+        maya.setData("application/x-maya-data", QtCore.QByteArray(b"import maya.cmds as cmds\ncmds.polySphere()"))
+        boton = arrastre.boton_de(maya)
+        self.assertEqual(boton["tipo"], "python")
+
+    def test_arrastrar_un_boton_del_menu(self):
+        menu = MenuRadial(al_ejecutar=lambda i, opciones=False: None, al_mover=lambda c: None,
+                          al_configurar=lambda: None)
+        menu.usar_radial(rd.por_defecto())
+        menu.show()
+        self.addCleanup(menu.close)
+        lanzados = []
+        with unittest.mock.patch.object(QtGui.QDrag, "exec", lambda d, *a: lanzados.append(d.mimeData())):
+            menu._pulsado, menu._inicio_pulsado = 0, QtCore.QPoint(10, 10)
+            evento = QtGui.QMouseEvent(QEvent.MouseMove, QtCore.QPointF(60, 60), QtCore.QPointF(60, 60),
+                                       Qt.NoButton, Qt.LeftButton, Qt.NoModifier)
+            self.assertTrue(menu._arrastrar_boton(evento))
+        self.assertEqual(arrastre.boton_de(lanzados[0])["texto"], rd.por_defecto()["botones"][0]["texto"])
 
 
 @unittest.skipIf(QtWidgets is None, "PySide6 no está instalado")

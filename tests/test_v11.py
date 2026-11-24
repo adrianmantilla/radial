@@ -9,7 +9,7 @@ RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(RAIZ, "scripts"))
 
 from radial import ajustes as aj  # noqa: E402
-from radial import automatico, interruptores  # noqa: E402
+from radial import automatico, grabar, interruptores  # noqa: E402
 from radial import radiales as rd  # noqa: E402
 from radial.biblioteca import CLASE, MIO, Biblioteca  # noqa: E402
 from radial.i18n import sinonimos  # noqa: E402
@@ -200,6 +200,37 @@ class PruebaAtajo(unittest.TestCase):
         for malo in ("R", "Shift+R", "", "Ctrl+", "Hyper+R", "Ctrl+Raro"):
             with self.assertRaises(atajo.AtajoNoValido):
                 atajo.partes(malo, mac=False)
+
+
+class PruebaGrabar(unittest.TestCase):
+    REGISTRO = """// Result: pCube1
+select -r pCube1 ;
+polyExtrudeFacet -constructionHistory 1 -keepFacesTogether 1 pCube1.f[1];
+// Result: polyExtrudeFace1 //
+setAttr "polyExtrudeFace1.localTranslate" -type double3 0 0 0.5 ;
+setAttr "polyExtrudeFace1.localTranslate" -type double3 0 0 0.5 ;
+setToolTo moveSuperContext;
+# Warning: algo #
+polyBevel3 -fraction 0.2 pCube1.e[4];
+sin punto y coma
+"""
+
+    def test_solo_ordenes_utiles(self):
+        self.assertEqual(grabar.ordenes(self.REGISTRO), [
+            "polyExtrudeFacet -constructionHistory 1 -keepFacesTogether 1 pCube1.f[1];",
+            'setAttr "polyExtrudeFace1.localTranslate" -type double3 0 0 0.5 ;',
+            "polyBevel3 -fraction 0.2 pCube1.e[4];"])
+        self.assertEqual(len(grabar.ordenes(self.REGISTRO, limite=1)), 1)
+        self.assertEqual(grabar.ordenes(None), [])
+
+    def test_boton(self):
+        boton = grabar.boton(["polyBevel3 -fraction 0.2;", "  "])
+        self.assertEqual(boton["tipo"], "mel")
+        self.assertEqual(boton["texto"], "polyBevel3")
+        self.assertEqual(boton["accion"], "polyBevel3 -fraction 0.2;")
+        self.assertEqual(grabar.boton(["a;", "b;"], "Mío")["accion"], "a;\nb;")
+        self.assertIsNone(grabar.boton([]))
+        rd.normalizar_boton(boton)  # es un botón válido
 
 
 class PruebaGlosario(unittest.TestCase):

@@ -150,6 +150,8 @@ class MenuRadial(MenuComun, QtWidgets.QWidget):
         if self._arrastre is not None:
             self.move(posicion_global(evento) - self._arrastre)
             return
+        if self._arrastrar_boton(evento):
+            return
         self._fijar_sobre(rd.que_hay_en(*self._local(posicion_local(evento)), apariencia=self.apariencia,
                                        n=self.num()))
 
@@ -169,6 +171,7 @@ class MenuRadial(MenuComun, QtWidgets.QWidget):
                 self._al_configurar()
         elif isinstance(sobre, int) and evento.button() == Qt.LeftButton:
             self._pulsado = sobre
+            self._inicio_pulsado = posicion_local(evento)
         evento.accept()
 
     def mouseReleaseEvent(self, evento):

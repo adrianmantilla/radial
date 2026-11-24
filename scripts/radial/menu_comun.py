@@ -8,9 +8,9 @@
 """
 
 from radial import radiales as rd
-from radial.arrastre import SoltarBoton
-from radial.dibujo import COLOR_ABIERTO, COLOR_FONDO
-from radial.qt import QtCore, QtGui, QtWidgets
+from radial.arrastre import SoltarBoton, datos_mime
+from radial.dibujo import COLOR_ABIERTO, COLOR_FONDO, COLOR_ICONO_CLARO, pixmap_icono
+from radial.qt import QtCore, QtGui, QtWidgets, posicion_local
 
 Qt = QtCore.Qt
 
@@ -39,6 +39,28 @@ class MenuComun(SoltarBoton):
             self.carpeta = None
         if isinstance(getattr(self, "_sobre", None), int) and self._sobre >= self.num():
             self._sobre = None
+
+    # --- Arrastrar un botón a otro menú ---------------------------------------------
+
+    def _arrastrar_boton(self, evento):
+        """Pulsar un botón y arrastrar: lleva una copia a otro botón (de este menú o de la pill extra)."""
+        indice = getattr(self, "_pulsado", None)
+        inicio = getattr(self, "_inicio_pulsado", None)
+        if (not isinstance(indice, int) or inicio is None or not evento.buttons() & Qt.LeftButton
+                or (posicion_local(evento) - inicio).manhattanLength() < QtWidgets.QApplication.startDragDistance()):
+            return False
+        boton = self.botones_visibles()[indice]
+        self._pulsado = None
+        if boton["tipo"] == "vacio":
+            return False
+        import copy
+        arrastre = QtGui.QDrag(self)
+        arrastre.setMimeData(datos_mime(copy.deepcopy(boton)))
+        mapa = pixmap_icono(boton.get("icono", ""), 22, self.devicePixelRatioF(), COLOR_ICONO_CLARO)
+        if mapa is not None:
+            arrastre.setPixmap(mapa)
+        arrastre.exec(Qt.CopyAction)
+        return True
 
     # --- Gesto (Tab, Tab mantenido y soltar) ------------------------------------
 
