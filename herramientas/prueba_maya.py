@@ -1,0 +1,83 @@
+"""Prueba de las fases 0 y 1 dentro de Maya, sin interfaz (herramienta de desarrollo).
+
+Desde la terminal, con el mayapy de cada versión:
+
+    /Applications/Autodesk/maya2027/Maya.app/Contents/bin/mayapy herramientas/prueba_maya.py
+    "C:\\Program Files\\Autodesk\\Maya2027\\bin\\mayapy.exe" herramientas\\prueba_maya.py
+
+No toca tus preferencias de Maya. Comprueba que el plugin carga, que todos los
+comandos de los radiales preconfigurados existen en esta versión de Maya y que
+los botones se ejecutan. El doble Tab y el menú flotante necesitan la interfaz
+de Maya: pruébalos abriendo Maya normalmente.
+Termina con «RESULTADO: OK» o con la lista de fallos.
+"""
+
+import os
+import sys
+import traceback
+
+RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(RAIZ, "scripts"))
+
+fallos = []
+
+
+def comprobar(condicion, texto):
+    print(("  ok    " if condicion else "  FALLO ") + texto)
+    if not condicion:
+        fallos.append(texto)
+
+
+def main():
+    import maya.standalone
+    maya.standalone.initialize(name="python")
+    from maya import cmds
+
+    print("Maya", cmds.about(version=True), "-", cmds.about(operatingSystem=True))
+
+    ruta_plugin = os.path.join(RAIZ, "plug-ins", "radial_plugin.py")
+    cmds.loadPlugin(ruta_plugin)
+    comprobar(cmds.pluginInfo("radial_plugin", query=True, loaded=True), "el plugin se carga")
+
+    from radial import acciones, radiales as rd
+    for identificador, ruta in rd.preconfigurados():
+        radial = rd.leer(ruta)
+        for i, boton in enumerate(radial["botones"]):
+            if boton["tipo"] == "comando":
+                comprobar(acciones.comando_existe(boton["accion"]),
+                          "{} · botón {}: existe el comando {}".format(identificador, i + 1, boton["accion"]))
+
+    # Ejecutar botones de cada tipo sobre una escena de prueba
+    cubo = cmds.polyCube(name="radial_prueba")[0]
+    cmds.move(3, 2, 1, cubo)
+    cmds.select(cubo)
+    comprobar(acciones.ejecutar({"texto": "Congelar", "tipo": "comando", "accion": "FreezeTransformations"}),
+              "un comando de Maya se ejecuta")
+    comprobar(cmds.getAttr(cubo + ".translate")[0] == (0.0, 0.0, 0.0), "Congelar transformaciones funcionó")
+    comprobar(acciones.ejecutar({"texto": "Python", "tipo": "python",
+                                 "accion": "from maya import cmds\ncmds.polySphere(name='radial_esfera')"}),
+              "código Python se ejecuta")
+    comprobar(cmds.objExists("radial_esfera"), "el código Python creó la esfera")
+    comprobar(acciones.ejecutar({"texto": "MEL", "tipo": "mel", "accion": 'polyCylinder -name "radial_cilindro";'}),
+              "código MEL se ejecuta")
+    comprobar(cmds.objExists("radial_cilindro"), "el código MEL creó el cilindro")
+    cmds.undo()
+    comprobar(not cmds.objExists("radial_cilindro"), "un Ctrl+Z deshace el botón MEL")
+    comprobar(not acciones.ejecutar({"texto": "Roto", "tipo": "python", "accion": "1/0"}),
+              "un botón con error avisa sin romper nada")
+    comprobar(not acciones.ejecutar({"texto": "No existe", "tipo": "comando", "accion": "ComandoQueNoExiste"}),
+              "un comando inexistente avisa sin romper nada")
+
+    cmds.unloadPlugin("radial_plugin")
+    comprobar(not cmds.pluginInfo("radial_plugin", query=True, loaded=True), "el plugin se descarga")
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception:
+        traceback.print_exc()
+        fallos.append("error inesperado")
+    print()
+    print("RESULTADO: OK" if not fallos else "RESULTADO: {} fallos".format(len(fallos)))
+    os._exit(0 if not fallos else 1)

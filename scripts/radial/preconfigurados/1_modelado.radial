@@ -1,0 +1,13 @@
+{
+  "formato": 1,
+  "nombre": "Modelado",
+  "botones": [
+    {"texto": "Duplicar", "detalle": "especial", "icono": "duplicar", "tipo": "comando", "accion": "DuplicateSpecialOptions"},
+    {"texto": "Centrar", "detalle": "pivote", "icono": "pivote", "tipo": "comando", "accion": "CenterPivot"},
+    {"texto": "Congelar", "detalle": "transformaciones", "icono": "congelar", "tipo": "comando", "accion": "FreezeTransformations"},
+    {"texto": "Borrar", "detalle": "historial", "icono": "historial", "tipo": "comando", "accion": "DeleteHistory"},
+    {"texto": "Hypershade", "detalle": "", "icono": "hypershade", "tipo": "comando", "accion": "HypershadeWindow"},
+    {"texto": "Render", "detalle": "View", "icono": "render", "tipo": "comando", "accion": "RenderViewWindow"}
+  ],
+  "apariencia": {"radio": 84, "punto": 5, "abierto": 21, "opacidad": 1.0}
+}
