@@ -2,10 +2,13 @@
 
 Un botón puede usar uno de estos iconos por su nombre, un icono de Maya
 (por ejemplo ``:/polyCube.png``) o la ruta de un archivo de imagen. Si no
-tiene icono, se dibuja la inicial de su texto.
+tiene icono, ``de_boton`` elige uno del mismo estilo según su acción
+(``iconos_acciones.py``) y, si no hay ninguno que encaje, se dibuja la inicial.
 """
 
 import os
+
+from radial import iconos_acciones
 
 TRAZOS = {
     "duplicar": "M8.5 8.5h11v11h-11z M5 15.5V4.5h11",
@@ -44,6 +47,10 @@ TRAZOS = {
     "lupa": "M4.5 10.5a6 6 0 1 0 12 0a6 6 0 1 0 -12 0 M15 15l5 5",
 }
 
+# Los iconos de las acciones de Maya (extruir, biselar, luces, claves...)
+for _nombre, _trazo in iconos_acciones.TRAZOS_ACCIONES.items():
+    TRAZOS.setdefault(_nombre, _trazo)
+
 _SVG = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" '
         'stroke="{color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">'
         '<path d="{trazo}"/></svg>')
@@ -60,3 +67,29 @@ def svg(nombre, color="#141414"):
 def es_imagen(icono):
     """True si ``icono`` apunta a una imagen (recurso de Maya o archivo)."""
     return bool(icono) and (icono.startswith(":") or os.path.isfile(icono))
+
+
+def de_boton(boton, categoria=""):
+    """El icono que se dibuja en ``boton``: el suyo o, si no tiene, uno del mismo estilo.
+
+    Los comandos de Maya sin icono propio usan el de su acción (``"PolyExtrude"``
+    -> ``"extruir"``) o, si no se conoce, el genérico ``"orden"``. Los botones de
+    Python o MEL usan el del comando que llaman, si se reconoce. Devuelve "" si
+    no hay icono (entonces se dibuja la inicial del texto).
+    """
+    if not boton:
+        return ""
+    icono = boton.get("icono", "") or ""
+    if icono:
+        return icono
+    if boton.get("tipo") == "carpeta":
+        return "carpeta"
+    icono = iconos_acciones.icono_de_boton(boton, categoria)
+    if not icono and boton.get("tipo") == "comando" and (boton.get("accion") or "").strip():
+        icono = "orden"
+    return icono
+
+
+def de_imagen_maya(boton):
+    """Para botones traídos de un estante: el icono propio que sustituye a su imagen de Maya, o ""."""
+    return iconos_acciones.icono_de_boton(dict(boton, icono=""))

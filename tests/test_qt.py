@@ -714,17 +714,48 @@ class PruebaIconosBuscador(unittest.TestCase):
         lista = ListaResultadosPrueba(lambda accion: None)
         lista.buscar_icono = lambda nombre: pedidos.append(nombre) or ":/noExiste.png"
         self.addCleanup(lista.close)
-        acciones = [busqueda.accion_de_comando("PolyExtrude"), busqueda.accion_de_comando("SelectAll")]
+        acciones = [busqueda.accion_de_comando("PolyExtrude"), busqueda.accion_de_comando("SelectAll"),
+                    busqueda.accion_de_comando("ZzRaroSinPalabras")]
         lista.fijar(acciones, "poly")
         lista.setFixedWidth(360)
         lista.show()
-        self.assertFalse(lista.grab().isNull())  # sin icono de verdad dibuja la inicial
-        self.assertIn("PolyExtrude", pedidos)
-        self.assertEqual(lista.icono_de(acciones[0]), ":/noExiste.png")
+        self.assertFalse(lista.grab().isNull())
+        # Los comandos conocidos usan el icono de línea del plugin, sin preguntar a Maya
+        self.assertEqual(lista.icono_de(acciones[0]), "extruir")
+        self.assertEqual(lista.icono_de(acciones[1]), "seleccionar_todo")
+        self.assertNotIn("PolyExtrude", pedidos)
+        # Solo un comando que no se reconoce prueba el icono de Maya
+        self.assertEqual(lista.icono_de(acciones[2]), ":/noExiste.png")
+        self.assertIn("ZzRaroSinPalabras", pedidos)
         estante = busqueda.accion_de_estante("Poly", {"texto": "Cubo", "icono": "cubo", "tipo": "mel",
                                                       "accion": "polyCube;"})
         self.assertEqual(lista.icono_de(estante), "cubo")
 
+
+class PruebaIconosAcciones(unittest.TestCase):
+    def test_todos_los_iconos_se_dibujan(self):
+        from radial import iconos
+        from radial.dibujo import pixmap_icono
+        for nombre in iconos.TRAZOS:
+            mapa = pixmap_icono(nombre, 24, 1.0, "#ececec")
+            self.assertIsNotNone(mapa, nombre)
+            imagen = mapa.toImage()
+            pintados = sum(1 for x in range(0, 24, 2) for y in range(0, 24, 2) if imagen.pixelColor(x, y).alpha() > 40)
+            self.assertGreater(pintados, 3, nombre)
+
+    def test_botones_sin_icono_en_radial_y_pill(self):
+        radial = rd.por_defecto()
+        radial["botones"][0] = {"texto": "Extruir", "detalle": "", "icono": "", "tipo": "comando",
+                                "accion": "PolyExtrude"}
+        radial["botones"][1] = {"texto": "Mi script", "detalle": "", "icono": "", "tipo": "python",
+                                "accion": "print(1)"}
+        for clase in (MenuRadial, MenuPill):
+            menu = clase()
+            self.addCleanup(menu.close)
+            menu.usar_radial(rd.normalizar(radial))
+            menu.colocar(QtCore.QPoint(300, 300))
+            menu.show()
+            self.assertFalse(menu.grab().isNull())
 
 if __name__ == "__main__":
     unittest.main()

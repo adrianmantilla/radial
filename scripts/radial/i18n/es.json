@@ -63,6 +63,8 @@
   "config_icono_maya": "Icono de Maya...",
   "config_sin_icono": "Sin icono",
   "config_icono_ninguno": "Sin icono: se ve la inicial del texto.",
+  "config_icono_automatico": "Automático: el de su acción.",
+  "config_filtrar_iconos": "Filtrar iconos (extruir, luz, clave...)",
   "config_iconos_maya_titulo": "Elegir un icono de Maya",
   "config_buscar_icono": "Buscar icono (por ejemplo: cube, light, uv)",
   "config_accion": "Acción",
