@@ -390,17 +390,32 @@ def _puede_contar(es_segundo):
     return visible() or _sobre_visor()
 
 
-def _instalar_filtro():
+def _instalar_filtro(intentos=10):
+    """Escucha el teclado en las ventanas de Maya (no en toda la aplicación)."""
+    if os.environ.get("RADIAL_SIN_TECLADO"):
+        return
     from radial.filtro_teclado import FiltroTeclado
+    principal = ventana_maya()
+    ventana = principal.windowHandle() if principal is not None else None
+    if ventana is None:
+        if intentos > 0:  # la ventana de Maya aún no está a la vista
+            QtCore.QTimer.singleShot(1000, lambda: _instalar_filtro(intentos - 1))
+        return
     _quitar_filtro()
     filtro = FiltroTeclado(_puede_contar, alternar, ajustes().ventana_ms)
-    filtro.instalar()
+    filtro.instalar([ventana])
+    # Paneles separados de la ventana principal: se escuchan cuando reciben el foco.
+    QtGui.QGuiApplication.instance().focusWindowChanged.connect(filtro.escuchar)
     _estado["filtro"] = filtro
 
 
 def _quitar_filtro():
     filtro = _estado["filtro"]
     if filtro is not None:
+        try:
+            QtGui.QGuiApplication.instance().focusWindowChanged.disconnect(filtro.escuchar)
+        except (RuntimeError, TypeError):
+            pass
         filtro.quitar()
         destruir(filtro)
     _estado["filtro"] = None
@@ -548,7 +563,8 @@ def iniciar():
         return
     crear_menu()
     _crear_comandos()
-    _instalar_filtro()
+    # Con Maya ya abierto, no a mitad del arranque.
+    QtCore.QTimer.singleShot(2000, _instalar_filtro)
     print(t("iniciado", version=radial.__version__))
 
 

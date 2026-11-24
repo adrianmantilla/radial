@@ -58,9 +58,15 @@ class PruebaInterfaz(unittest.TestCase):
         self.im = importlib.import_module("radial.interfaz_maya")
         self.cmds = sys.modules["maya.cmds"]
         self.im.iniciar()
+        # Maya falso sin ventana principal: se pone una para que se instale el filtro.
+        self.principal = QtWidgets.QWidget()
+        self.principal.winId()
+        self.im.ventana_maya = lambda: self.principal
+        self.im._instalar_filtro()
 
     def tearDown(self):
         self.im.detener()
+        sys.modules["radial.qt"].destruir(self.principal)
         self.modulos.stop()
         self.tmp.cleanup()
 
@@ -76,6 +82,18 @@ class PruebaInterfaz(unittest.TestCase):
         self.assertIsNotNone(filtro)
         self.assertTrue(filtro.detector.pulsar(0, self.im._puede_contar(False)) is False)
         self.assertTrue(self.im._puede_contar(True))
+
+    def test_filtro_en_la_ventana_y_no_en_la_aplicacion(self):
+        filtro = self.im._estado["filtro"]
+        self.assertEqual(filtro._objetivos, [self.principal.windowHandle()])
+        self.im.detener()
+        self.assertEqual(filtro._objetivos, [])
+
+    def test_sin_ventana_no_rompe(self):
+        self.im._quitar_filtro()
+        self.im.ventana_maya = lambda: None
+        self.im._instalar_filtro(intentos=0)
+        self.assertIsNone(self.im._estado["filtro"])
 
     def test_fuera_del_visor_no_cuenta(self):
         self.cmds.getPanel.side_effect = lambda **k: "nodeEditorPanel1" if k.get("underPointer") \

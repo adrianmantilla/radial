@@ -18,6 +18,7 @@ QEvent = QtCore.QEvent
 
 _TECLAS_MODIFICADORAS = {Qt.Key_Shift, Qt.Key_Control, Qt.Key_Meta, Qt.Key_Alt, Qt.Key_AltGr,
                          Qt.Key_CapsLock}
+_TIPOS = (QEvent.ShortcutOverride, QEvent.KeyPress, QEvent.MouseButtonPress)
 _WIDGETS_DE_TEXTO = (QtWidgets.QLineEdit, QtWidgets.QTextEdit, QtWidgets.QPlainTextEdit,
                      QtWidgets.QAbstractSpinBox)
 
@@ -53,17 +54,39 @@ class FiltroTeclado(QtCore.QObject):
         self._momento_decision = None
         self._quedarse = False
         self._foco_primer_tab = None
+        self._objetivos = []
 
-    def instalar(self):
-        QtWidgets.QApplication.instance().installEventFilter(self)
+    def instalar(self, ventanas=None):
+        """Empieza a escuchar.
+
+        En Maya se escuchan solo sus ventanas (``ventanas``: objetos QWindow), no
+        toda la aplicación: un filtro de Python en la QApplication recibe todos
+        los eventos de Maya, también los de objetos a medio destruir, y Maya se
+        puede cerrar de golpe. Sin ``ventanas`` (pruebas) se usa la aplicación.
+        """
+        self._objetivos = []
+        if ventanas is None:
+            ventanas = [QtWidgets.QApplication.instance()]
+        for ventana in ventanas:
+            self.escuchar(ventana)
+
+    def escuchar(self, objeto):
+        """Añade una ventana más (por ejemplo, un panel separado de la ventana principal)."""
+        if not sigue_vivo(objeto) or any(o is objeto for o in self._objetivos):
+            return
+        objeto.installEventFilter(self)
+        self._objetivos.append(objeto)
 
     def quitar(self):
-        app = QtWidgets.QApplication.instance()
-        if app is not None:
-            app.removeEventFilter(self)
+        for objeto in getattr(self, "_objetivos", []):
+            if sigue_vivo(objeto):
+                objeto.removeEventFilter(self)
+        self._objetivos = []
 
     def eventFilter(self, objeto, evento):
         tipo = evento.type()
+        if tipo not in _TIPOS:
+            return False
         if tipo == QEvent.ShortcutOverride or tipo == QEvent.KeyPress:
             try:
                 return self._tecla(tipo, evento)
