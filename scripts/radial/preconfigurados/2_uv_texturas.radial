@@ -12,14 +12,14 @@
     {
       "texto": "Proyección",
       "detalle": "automática",
-      "icono": "cubo",
+      "icono": "proyeccion_auto",
       "tipo": "mel",
       "accion": "polyAutoProjection;"
     },
     {
       "texto": "Proyección",
       "detalle": "plana",
-      "icono": "plano",
+      "icono": "proyeccion_plana",
       "tipo": "mel",
       "accion": "polyPlanarProjection -md b;"
     },

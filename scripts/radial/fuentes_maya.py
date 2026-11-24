@@ -82,9 +82,15 @@ class FuentesMaya(object):
         if imagen and not os.path.isfile(imagen) and not imagen.startswith(":"):
             imagen = ":/" + imagen
         texto = etiqueta or descripcion or orden.strip().splitlines()[0]
-        return {"texto": texto[:40], "detalle": "", "icono": imagen,
-                "tipo": "python" if lenguaje.lower() == "python" else "mel", "accion": orden,
-                "descripcion": descripcion}
+        boton = {"texto": texto[:40], "detalle": "", "icono": imagen,
+                 "tipo": "python" if lenguaje.lower() == "python" else "mel", "accion": orden,
+                 "descripcion": descripcion}
+        # Si se reconoce el comando, el icono de línea del plugin en lugar del de Maya a color
+        from radial import iconos
+        propio = iconos.de_imagen_maya(boton)
+        if propio:
+            boton["icono"] = propio
+        return boton
 
     def iconos_maya(self, filtro="", limite=400):
         """Rutas de iconos de Maya (``:/nombre.png``) que contienen ``filtro``."""
